@@ -11,6 +11,19 @@ import akka.util.ByteString
 import spray.json._
 import DefaultJsonProtocol._
 import io.dronekit.oauth._
+import scala.collection.immutable.SortedMap
+
+//
+// class Response(res: Future[HttpResponse]){
+//   // wrapper class around a httpResponse future
+//
+//   def getResData(res: HttpResponse, cb:(String)  =>  Unit) = {
+//     val data = res.entity.dataBytes.runWith(Sink.head)
+//     data.map(byteSeq => byteSeq.map(b => b.toChar)).map(charSeq => {
+//       cb(charSeq.mkString)
+//     })
+//   }
+// }
 
 class Request(baseUri: String, isHttps: Boolean = false){
   implicit val system = ActorSystem()
@@ -29,7 +42,8 @@ class Request(baseUri: String, isHttps: Boolean = false){
   }
 
   private def getFormURLEncoded(params: Map[String, String]): String = {
-    (params.map{ x => java.net.URLEncoder.encode(x._1) + "="+ java.net.URLEncoder.encode(x._2)}).mkString("&")
+    val sortedParams = SortedMap(params.toList:_*)
+    (sortedParams.map{ x => URLEncoder.encode(x._1) + "="+ URLEncoder.encode(x._2)}).mkString("&")
   }
 
   def get(uri: String, params: Map[String, String]=Map(), method: HttpMethod=HttpMethods.GET, oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
@@ -61,15 +75,14 @@ class Request(baseUri: String, isHttps: Boolean = false){
       } else if (oauth.authProgress == AuthProgress.HasRequestTokens) {
         headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader( _netLoc + baseUri+uri)), RawHeader("Accept", "*/*"))
       }
-      println(s"oauth headers $headers")
     } else if (oauth.canSignRequests()){
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
-    val entity = if (params.size > 0 && !oauth.canSignRequests()) {
+    val entity = if (params.size > 0 && !oauth.canSignRequests() && json) {
         val paramStr = ByteString(params.toJson.toString)
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if (params.size > 0 && oauth.canSignRequests()) {
+    } else if ((params.size > 0 && json == false)|| oauth.canSignRequests()) {
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
       HttpEntity(contentType=ContentType(MediaTypes.`application/x-www-form-urlencoded`), contentLength=paramStr.length, Source(List(paramStr)))
