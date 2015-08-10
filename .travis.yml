@@ -1,0 +1,11 @@
+language: scala
+scala:
+  - 2.11.2
+
+install:
+  # do install steps here
+  - echo hello world
+
+script:
+  # do script steps here
+  - sbt ++$TRAVIS_SCALA_VERSION test

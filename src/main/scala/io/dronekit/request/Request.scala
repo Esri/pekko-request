@@ -43,23 +43,32 @@ class Request(baseUri: String, isHttps: Boolean = false){
 
   private def getFormURLEncoded(params: Map[String, String]): String = {
     val sortedParams = SortedMap(params.toList:_*)
-    (sortedParams.map{ x => URLEncoder.encode(x._1) + "="+ URLEncoder.encode(x._2)}).mkString("&")
+    sortedParams.map { paramTuple =>
+      java.net.URLEncoder.encode(paramTuple._1, "UTF-8") + "=" + java.net.URLEncoder.encode(paramTuple._2, "UTF-8")
+    }.mkString("&")
   }
 
-  def get(uri: String, params: Map[String, String]=Map(), method: HttpMethod=HttpMethods.GET, oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
+  def get(uri: String, params: Map[String, String] = Map(), method: HttpMethod=HttpMethods.GET,
+          oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
     var headers = List(RawHeader("Accept", "*/*"))
 
     if (oauth.canSignRequests()) {
       // get a signed header
-      headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "GET", params)), RawHeader("Accept", "*/*"))
+      headers = List(
+        RawHeader(
+          "Authorization",
+          oauth.getSignedHeader(_netLoc+baseUri+uri, "GET", params)
+        ),
+        RawHeader("Accept", "*/*")
+      )
     }
 
     var queryParams = ""
-    if (!params.isEmpty){
+    if (params.nonEmpty) {
       queryParams = "?" + getFormURLEncoded(params)
     }
 
-    Source.single(HttpRequest(uri=uri+queryParams,
+    Source.single(HttpRequest(uri = uri + queryParams,
       method=method,
       headers=headers)
      ).via(_outgoingConn).runWith(Sink.head)
@@ -71,11 +80,11 @@ class Request(baseUri: String, isHttps: Boolean = false){
 
     if (oauth.hasKeys && !oauth.canSignRequests()) {
       if (oauth.authProgress == AuthProgress.NotAuthed) {
-        headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader( _netLoc + baseUri+uri)), RawHeader("Accept", "*/*"))
+        headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       } else if (oauth.authProgress == AuthProgress.HasRequestTokens) {
-        headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader( _netLoc + baseUri+uri)), RawHeader("Accept", "*/*"))
+        headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       }
-    } else if (oauth.canSignRequests()){
+    } else if (oauth.canSignRequests()) {
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
@@ -83,6 +92,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
         val paramStr = ByteString(params.toJson.toString)
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
     } else if ((params.size > 0 && json == false)|| oauth.canSignRequests()) {
+
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
       HttpEntity(contentType=ContentType(MediaTypes.`application/x-www-form-urlencoded`), contentLength=paramStr.length, Source(List(paramStr)))
@@ -93,7 +103,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
     val postRequest = HttpRequest(
       uri=uri,
       method=HttpMethods.POST,
-      headers = headers, // Alternative is to use Accept(MediaTypes.`*/*`) but I can't figure out how to escape that...
+      headers = headers,
       entity=entity)
 
     Source.single(postRequest).via(_outgoingConn).runWith(Sink.head)
