@@ -52,7 +52,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
           oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
     var headers = List(RawHeader("Accept", "*/*"))
 
-    if (oauth.canSignRequests()) {
+    if (oauth.canSignRequests) {
       // get a signed header
       headers = List(
         RawHeader(
@@ -78,20 +78,20 @@ class Request(baseUri: String, isHttps: Boolean = false){
 
     var headers = List(RawHeader("Accept", "*/*"))
 
-    if (oauth.hasKeys && !oauth.canSignRequests()) {
+    if (oauth.hasKeys && !oauth.canSignRequests) {
       if (oauth.authProgress == AuthProgress.NotAuthed) {
         headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       } else if (oauth.authProgress == AuthProgress.HasRequestTokens) {
         headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       }
-    } else if (oauth.canSignRequests()) {
+    } else if (oauth.canSignRequests) {
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
-    val entity = if (params.size > 0 && !oauth.canSignRequests() && json) {
+    val entity = if (params.size > 0 && !oauth.canSignRequests && json) {
         val paramStr = ByteString(params.toJson.toString)
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if ((params.size > 0 && json == false)|| oauth.canSignRequests()) {
+    } else if ((params.size > 0 && json == false)|| oauth.canSignRequests) {
 
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
