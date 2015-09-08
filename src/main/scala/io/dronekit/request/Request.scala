@@ -11,6 +11,19 @@ import akka.util.ByteString
 import spray.json._
 import DefaultJsonProtocol._
 import io.dronekit.oauth._
+import scala.collection.immutable.SortedMap
+
+//
+// class Response(res: Future[HttpResponse]){
+//   // wrapper class around a httpResponse future
+//
+//   def getResData(res: HttpResponse, cb:(String)  =>  Unit) = {
+//     val data = res.entity.dataBytes.runWith(Sink.head)
+//     data.map(byteSeq => byteSeq.map(b => b.toChar)).map(charSeq => {
+//       cb(charSeq.mkString)
+//     })
+//   }
+// }
 
 class Request(baseUri: String, isHttps: Boolean = false){
   implicit val system = ActorSystem()
@@ -29,7 +42,8 @@ class Request(baseUri: String, isHttps: Boolean = false){
   }
 
   private def getFormURLEncoded(params: Map[String, String]): String = {
-    params.map { paramTuple =>
+    val sortedParams = SortedMap(params.toList:_*)
+    sortedParams.map { paramTuple =>
       java.net.URLEncoder.encode(paramTuple._1, "UTF-8") + "=" + java.net.URLEncoder.encode(paramTuple._2, "UTF-8")
     }.mkString("&")
   }
@@ -75,10 +89,11 @@ class Request(baseUri: String, isHttps: Boolean = false){
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
-    val entity = if (params.nonEmpty && !oauth.canSignRequests) {
-        val paramStr = ByteString(params.toJson.toString())
+    val entity = if (params.size > 0 && !oauth.canSignRequests && json) {
+        val paramStr = ByteString(params.toJson.toString)
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if (params.nonEmpty && oauth.canSignRequests) {
+    } else if ((params.size > 0 && json == false)|| oauth.canSignRequests) {
+
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
       HttpEntity(contentType=ContentType(MediaTypes.`application/x-www-form-urlencoded`), contentLength=paramStr.length, Source(List(paramStr)))
@@ -89,7 +104,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
     val postRequest = HttpRequest(
       uri=uri,
       method=HttpMethods.POST,
-      headers = headers, // Alternative is to use Accept(MediaTypes.`*/*`) but I can't figure out how to escape that...
+      headers = headers,
       entity=entity)
 
     Source.single(postRequest).via(_outgoingConn).map{response => println(response); response}.runWith(Sink.head)
