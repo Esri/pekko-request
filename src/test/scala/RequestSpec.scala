@@ -3,13 +3,13 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import io.dronekit.oauth._
 import io.dronekit.request.Request
-import org.scalatest.{Matchers, FunSpec}
 import org.scalatest.concurrent.ScalaFutures
 import spray.json._
+import org.scalatest._
 
 import scala.concurrent.duration._
 
-class RequestSpec extends FunSpec with Matchers with ScalaFutures{
+class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
   import testSystem.dispatcher
   implicit val materializer = ActorMaterializer()

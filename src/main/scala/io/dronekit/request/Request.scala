@@ -38,7 +38,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
           oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
     var headers = List(RawHeader("Accept", "*/*"))
 
-    if (oauth.canSignRequests()) {
+    if (oauth.canSignRequests) {
       // get a signed header
       headers = List(
         RawHeader(
@@ -61,24 +61,24 @@ class Request(baseUri: String, isHttps: Boolean = false){
   }
 
   def post(uri: String, params: Map[String, String]=Map(), oauth: Oauth=new Oauth("", ""), json: Boolean=true): Future[HttpResponse] = {
+    println(s"requests:post - uri:$uri, params:$params, oauth:$oauth, json:$json")
 
     var headers = List(RawHeader("Accept", "*/*"))
 
-    if (oauth.hasKeys && !oauth.canSignRequests()) {
-      if (oauth.authProgress == AuthProgress.NotAuthed) {
+    if (oauth.hasKeys && !oauth.canSignRequests) {
+      if (oauth.authProgress == AuthProgress.Unauthenticated) {
         headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       } else if (oauth.authProgress == AuthProgress.HasRequestTokens) {
         headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader(_netLoc+baseUri+uri)), RawHeader("Accept", "*/*"))
       }
-      println(s"oauth headers $headers")
-    } else if (oauth.canSignRequests()) {
+    } else if (oauth.canSignRequests) {
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
-    val entity = if (params.nonEmpty && !oauth.canSignRequests()) {
+    val entity = if (params.nonEmpty && !oauth.canSignRequests) {
         val paramStr = ByteString(params.toJson.toString())
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if (params.nonEmpty && oauth.canSignRequests()) {
+    } else if (params.nonEmpty && oauth.canSignRequests) {
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
       HttpEntity(contentType=ContentType(MediaTypes.`application/x-www-form-urlencoded`), contentLength=paramStr.length, Source(List(paramStr)))
@@ -92,7 +92,7 @@ class Request(baseUri: String, isHttps: Boolean = false){
       headers = headers, // Alternative is to use Accept(MediaTypes.`*/*`) but I can't figure out how to escape that...
       entity=entity)
 
-    Source.single(postRequest).via(_outgoingConn).runWith(Sink.head)
+    Source.single(postRequest).via(_outgoingConn).map{response => println(response); response}.runWith(Sink.head)
   }
 
   def delete(uri: String): Future[HttpResponse] =
