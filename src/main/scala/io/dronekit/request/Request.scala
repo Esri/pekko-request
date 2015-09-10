@@ -1,33 +1,36 @@
 package io.dronekit.request
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import scala.concurrent.Future
-import akka.stream.scaladsl._
+import akka.event.{Logging, LoggingAdapter}
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl._
+import akka.stream.stage.{SyncDirective, Context, PushPullStage}
 import akka.util.ByteString
-import spray.json._
-import DefaultJsonProtocol._
 import io.dronekit.oauth._
+import spray.json.DefaultJsonProtocol._
+import spray.json._
+
 import scala.collection.immutable.SortedMap
+import scala.concurrent.Future
 
-//
-// class Response(res: Future[HttpResponse]){
-//   // wrapper class around a httpResponse future
-//
-//   def getResData(res: HttpResponse, cb:(String)  =>  Unit) = {
-//     val data = res.entity.dataBytes.runWith(Sink.head)
-//     data.map(byteSeq => byteSeq.map(b => b.toChar)).map(charSeq => {
-//       cb(charSeq.mkString)
-//     })
-//   }
-// }
+class LogByteStream()(implicit adapter: LoggingAdapter) extends PushPullStage[ByteString, ByteString] {
+  override def onPush(elem: ByteString, ctx: Context[ByteString]): SyncDirective = {
+    adapter.debug(s"Payload: ${elem.map(_.toChar).mkString}")
+    ctx.push(elem)
+  }
 
-class Request(baseUri: String, isHttps: Boolean = false){
+  override def onPull(ctx: Context[ByteString]): SyncDirective =
+    ctx.pull()
+}
+
+
+class Request(baseUri: String, isHttps: Boolean = false) {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
+  implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
 
   private val _outgoingConn = if (isHttps) {
     Http().outgoingConnectionTls(baseUri)
@@ -39,6 +42,23 @@ class Request(baseUri: String, isHttps: Boolean = false){
     "https://"
   } else {
     "http://"
+  }
+
+  def byteStringToString(data: ByteString): String = data.map(_.toChar).mkString
+
+
+  def logRequest(request: HttpRequest): HttpRequest = {
+    implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest:REQUEST")
+    adapter.debug(s"${request.getUri()}, ${request.method}")
+    if (request.entity.isKnownEmpty()) request
+    else request.copy(entity = request.entity.transformDataBytes(
+      Flow[ByteString].transform(() => new LogByteStream()(adapter))))
+  }
+
+  def logResponse(response: HttpResponse): HttpResponse = {
+    implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest:RESPONSE")
+    response.copy(entity = response.entity.transformDataBytes(
+      Flow[ByteString].transform(() => new LogByteStream()(adapter))))
   }
 
   private def getFormURLEncoded(params: Map[String, String]): String = {
@@ -68,14 +88,14 @@ class Request(baseUri: String, isHttps: Boolean = false){
       queryParams = "?" + getFormURLEncoded(params)
     }
 
-    Source.single(HttpRequest(uri = uri + queryParams,
-      method=method,
-      headers=headers)
-     ).via(_outgoingConn).runWith(Sink.head)
+    Source.single(HttpRequest(uri = uri + queryParams, method=method, headers=headers))
+      .map(logRequest)
+      .via(_outgoingConn)
+      .map(logResponse)
+      .runWith(Sink.head)
   }
 
   def post(uri: String, params: Map[String, String]=Map(), oauth: Oauth=new Oauth("", ""), json: Boolean=true): Future[HttpResponse] = {
-    println(s"requests:post - uri:$uri, params:$params, oauth:$oauth, json:$json")
 
     var headers = List(RawHeader("Accept", "*/*"))
 
@@ -89,25 +109,32 @@ class Request(baseUri: String, isHttps: Boolean = false){
       headers = List(RawHeader("Authorization", oauth.getSignedHeader(_netLoc+baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
     }
 
-    val entity = if (params.size > 0 && !oauth.canSignRequests && json) {
-        val paramStr = ByteString(params.toJson.toString)
+    val entity = if (params.nonEmpty && !oauth.canSignRequests && json) {
+        val paramStr = ByteString(params.toJson.toString())
         HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if ((params.size > 0 && json == false)|| oauth.canSignRequests) {
+    } else if ((params.nonEmpty && json == false) || oauth.canSignRequests) {
 
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
-      HttpEntity(contentType=ContentType(MediaTypes.`application/x-www-form-urlencoded`), contentLength=paramStr.length, Source(List(paramStr)))
+      HttpEntity(
+        contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`),
+        contentLength = paramStr.length,
+        Source(List(paramStr)))
     } else {
       HttpEntity.Empty
     }
 
     val postRequest = HttpRequest(
-      uri=uri,
-      method=HttpMethods.POST,
+      uri = uri,
+      method = HttpMethods.POST,
       headers = headers,
-      entity=entity)
+      entity = entity)
 
-    Source.single(postRequest).via(_outgoingConn).map{response => println(response); response}.runWith(Sink.head)
+    Source.single(postRequest)
+      .map(logRequest)
+      .via(_outgoingConn)
+      .map(logResponse)
+      .runWith(Sink.head)
   }
 
   def delete(uri: String): Future[HttpResponse] =

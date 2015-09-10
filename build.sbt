@@ -30,6 +30,9 @@ libraryDependencies ++= {
     "io.spray" %%  "spray-json" % "1.3.2",
     "commons-codec" % "commons-codec" % "1.6",
     "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
-    "io.dronekit" %% "oauth-headers" % "0.1",
-    "org.scalatest" %% "scalatest" % "2.2.4" % "test")
+    "io.dronekit" %% "oauth-headers" % "0.2",
+    "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    "ch.qos.logback" % "logback-classic" % "1.1.3",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+  )
 }
