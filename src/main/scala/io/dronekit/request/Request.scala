@@ -16,6 +16,8 @@ import spray.json._
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
 
+class RequestException(msg: String) extends RuntimeException(msg)
+
 class LogByteStream()(implicit adapter: LoggingAdapter) extends PushPullStage[ByteString, ByteString] {
   override def onPush(elem: ByteString, ctx: Context[ByteString]): SyncDirective = {
     adapter.debug(s"Payload: ${elem.map(_.toChar).mkString}")
