@@ -32,10 +32,16 @@ class Request(baseUri: String, isHttps: Boolean = false) {
   implicit val materializer = ActorMaterializer()
   implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
 
+  // parse out the port number if there is a colon
+  val splitUri = baseUri.split(":")
+  if (splitUri.size > 2) {
+    throw new RequestException("BaseURI has too many colons, not sure how to parse out port. Do not include protocol in the base URI.")
+  }
+
   private val _outgoingConn = if (isHttps) {
-    Http().outgoingConnectionTls(baseUri)
+    Http().outgoingConnectionTls(if (splitUri.size == 2) splitUri(0) else baseUri, if (splitUri.size == 2) splitUri(1).toInt else 443 )
   } else {
-    Http().outgoingConnection(baseUri)
+    Http().outgoingConnection(if (splitUri.size == 2) splitUri(0) else baseUri, if (splitUri.size == 2) splitUri(1).toInt else 80 )
   }
 
   private val _netLoc = if(isHttps) {
@@ -57,6 +63,7 @@ class Request(baseUri: String, isHttps: Boolean = false) {
 
   def logResponse(response: HttpResponse): HttpResponse = {
     implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest:RESPONSE")
+    adapter.debug(s"Http Response Code ${response.status}")
     response.copy(entity = response.entity.transformDataBytes(
       Flow[ByteString].transform(() => new LogByteStream()(adapter))))
   }
