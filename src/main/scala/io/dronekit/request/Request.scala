@@ -1,5 +1,7 @@
 package io.dronekit.request
 
+import java.util.concurrent.TimeoutException
+
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
@@ -12,6 +14,9 @@ import akka.util.ByteString
 import io.dronekit.oauth._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
+import akka.pattern.after
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.Future
@@ -30,6 +35,7 @@ class LogByteStream()(implicit adapter: LoggingAdapter) extends PushPullStage[By
 
 
 class Request(baseUri: String, isHttps: Boolean = false) {
+  implicit val timeout: FiniteDuration = 60.seconds
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
   implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
@@ -97,11 +103,13 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       queryParams = "?" + getFormURLEncoded(params)
     }
 
-    Source.single(HttpRequest(uri = uri + queryParams, method=method, headers=headers))
+    val resp = Source.single(HttpRequest(uri = uri + queryParams, method=method, headers=headers))
       .map(logRequest)
       .via(_outgoingConn)
       .map(logResponse)
       .runWith(Sink.head)
+
+    Future.firstCompletedOf(resp :: after(timeout, system.scheduler)(Future.failed(new TimeoutException)):: Nil)
   }
 
   def post(uri: String, params: Map[String, String]=Map(), oauth: Oauth=new Oauth("", ""), json: Boolean=true): Future[HttpResponse] = {
@@ -139,11 +147,13 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       headers = headers,
       entity = entity)
 
-    Source.single(postRequest)
+    val resp = Source.single(postRequest)
       .map(logRequest)
       .via(_outgoingConn)
       .map(logResponse)
       .runWith(Sink.head)
+
+    Future.firstCompletedOf(resp :: after(timeout, system.scheduler)(Future.failed(new TimeoutException)):: Nil)
   }
 
   def delete(uri: String): Future[HttpResponse] =
