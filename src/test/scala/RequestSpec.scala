@@ -1,3 +1,5 @@
+import java.util.concurrent.TimeoutException
+
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
@@ -61,6 +63,19 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
           assert(jsObj.fields("args").toString === """{}""")
           assert(jsObj.fields("json").toString === """{"item":"2"}""")
         }
+      }
+    }
+
+    it("should be able to retry on timeout failures") {
+      var count = 0
+
+      request.httpTimeout = 1.micro // set super short timeout
+      val req = request.retry(3)(()=>{
+          count = count + 1
+          request.get("/get")})
+      ScalaFutures.whenReady(req.failed, timeout(5 seconds), interval(500 millis)) { res =>
+        assert(count == 4) // 4 tries in total, 3 retries + 1 original try
+        res shouldBe an [TimeoutException]
       }
     }
   }

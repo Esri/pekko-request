@@ -11,6 +11,9 @@ import io.dronekit.request
 val request = new Request("httpbin.org", isHttps=false)
 request.get("/get")
 request.get("/post", params=Map("herp"->"derp"))
+
+// make it auto retry on timeout
+request.retry(3)(()=>{request.get("/get")})
 ```
 
 If you want to use Oauth

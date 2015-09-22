@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.headers._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.stream.stage.{SyncDirective, Context, PushPullStage}
-import akka.util.ByteString
+import akka.util.{Timeout, ByteString}
 import io.dronekit.oauth._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
@@ -19,7 +19,8 @@ import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.collection.immutable.SortedMap
-import scala.concurrent.Future
+import scala.concurrent.{Promise, Future}
+import scala.util.{Failure, Success}
 
 class RequestException(msg: String) extends RuntimeException(msg)
 
@@ -35,7 +36,7 @@ class LogByteStream()(implicit adapter: LoggingAdapter) extends PushPullStage[By
 
 
 class Request(baseUri: String, isHttps: Boolean = false) {
-  implicit val timeout: FiniteDuration = 60.seconds
+  var httpTimeout = 60.seconds
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
   implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
@@ -83,6 +84,30 @@ class Request(baseUri: String, isHttps: Boolean = false) {
     }.mkString("&")
   }
 
+  def retry(retries: Int = 3)(req:() => Future[HttpResponse]): Future[HttpResponse] = {
+    val p = Promise[HttpResponse]()
+
+    def retryHelper(retryNum: Int = retries): Unit = {
+      // catch timeout errors
+      req().onComplete{
+        case Success(v) => p.success(v)
+        case Failure(ex) => ex match {
+          case ex: TimeoutException => {
+            if (retryNum <= 0) {
+              p.failure(ex)
+            } else {
+              retryHelper(retryNum - 1)
+            }
+          }
+          case _ => p.failure(ex)
+        }
+      }
+    }
+
+    retryHelper()
+    p.future
+  }
+
   def get(uri: String, params: Map[String, String] = Map(), method: HttpMethod=HttpMethods.GET,
           oauth: Oauth=new Oauth("", "")): Future[HttpResponse] = {
     var headers = List(RawHeader("Accept", "*/*"))
@@ -109,7 +134,7 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       .map(logResponse)
       .runWith(Sink.head)
 
-    Future.firstCompletedOf(resp :: after(timeout, system.scheduler)(Future.failed(new TimeoutException)):: Nil)
+    Future.firstCompletedOf(List(resp, after(httpTimeout, system.scheduler)(Future.failed(new TimeoutException))))
   }
 
   def post(uri: String, params: Map[String, String]=Map(), oauth: Oauth=new Oauth("", ""), json: Boolean=true): Future[HttpResponse] = {
@@ -153,7 +178,7 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       .map(logResponse)
       .runWith(Sink.head)
 
-    Future.firstCompletedOf(resp :: after(timeout, system.scheduler)(Future.failed(new TimeoutException)):: Nil)
+    Future.firstCompletedOf(List(resp, after(httpTimeout, system.scheduler)(Future.failed(new TimeoutException))))
   }
 
   def delete(uri: String): Future[HttpResponse] =
