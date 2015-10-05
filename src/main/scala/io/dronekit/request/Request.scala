@@ -1,5 +1,6 @@
 package io.dronekit.request
 
+import java.util.UUID
 import java.util.concurrent.TimeoutException
 
 import akka.actor.ActorSystem
@@ -24,9 +25,9 @@ import scala.util.{Failure, Success}
 
 class RequestException(msg: String) extends RuntimeException(msg)
 
-class LogByteStream()(implicit adapter: LoggingAdapter) extends PushPullStage[ByteString, ByteString] {
+class LogByteStream(prefix: String)(implicit adapter: LoggingAdapter) extends PushPullStage[ByteString, ByteString] {
   override def onPush(elem: ByteString, ctx: Context[ByteString]): SyncDirective = {
-    adapter.debug(s"Payload: ${elem.map(_.toChar).mkString}")
+    adapter.debug(s"$prefix - Payload: ${elem.map(_.toChar).mkString}")
     ctx.push(elem)
   }
 
@@ -62,19 +63,22 @@ class Request(baseUri: String, isHttps: Boolean = false) {
   def byteStringToString(data: ByteString): String = data.map(_.toChar).mkString
 
 
-  def logRequest(request: HttpRequest): HttpRequest = {
+  def logRequest(uuid: UUID)(request: HttpRequest): HttpRequest = {
     implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest:REQUEST")
-    adapter.debug(s"${request.getUri()}, ${request.method}")
-    if (request.entity.isKnownEmpty()) request
+    val prefix = s"$uuid:${request.method}:${request.getUri()}"
+    if (request.entity.isKnownEmpty()) {
+      adapter.debug(prefix)
+      request
+    }
     else request.copy(entity = request.entity.transformDataBytes(
-      Flow[ByteString].transform(() => new LogByteStream()(adapter))))
+      Flow[ByteString].transform(() => new LogByteStream(prefix)(adapter))))
   }
 
-  def logResponse(response: HttpResponse): HttpResponse = {
+  def logResponse(uuid: UUID)(response: HttpResponse): HttpResponse = {
     implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest:RESPONSE")
-    adapter.debug(s"Http Response Code ${response.status}")
+    val prefix = s"$uuid:${response.status}"
     response.copy(entity = response.entity.transformDataBytes(
-      Flow[ByteString].transform(() => new LogByteStream()(adapter))))
+      Flow[ByteString].transform(() => new LogByteStream(prefix)(adapter))))
   }
 
   private def getFormURLEncoded(params: Map[String, String]): String = {
@@ -128,10 +132,11 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       queryParams = "?" + getFormURLEncoded(params)
     }
 
+    val requestID = java.util.UUID.randomUUID()
     val resp = Source.single(HttpRequest(uri = uri + queryParams, method=method, headers=headers))
-      .map(logRequest)
+      .map(request => logRequest(requestID)(request))
       .via(_outgoingConn)
-      .map(logResponse)
+      .map(response => logResponse(requestID)(response))
       .runWith(Sink.head)
 
     Future.firstCompletedOf(List(resp, after(httpTimeout, system.scheduler)(Future.failed(new TimeoutException))))
@@ -172,10 +177,11 @@ class Request(baseUri: String, isHttps: Boolean = false) {
       headers = headers,
       entity = entity)
 
+    val requestID = java.util.UUID.randomUUID()
     val resp = Source.single(postRequest)
-      .map(logRequest)
+      .map(request =>logRequest(requestID)(request))
       .via(_outgoingConn)
-      .map(logResponse)
+      .map(response => logResponse(requestID)(response))
       .runWith(Sink.head)
 
     Future.firstCompletedOf(List(resp, after(httpTimeout, system.scheduler)(Future.failed(new TimeoutException))))
