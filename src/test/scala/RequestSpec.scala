@@ -3,8 +3,10 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
+import com.sksamuel.elastic4s.{ElasticsearchClientUri, ElasticClient}
 import io.dronekit.oauth._
 import io.dronekit.request.Request
+import org.elasticsearch.common.settings.ImmutableSettings
 import org.scalatest.concurrent.ScalaFutures
 import spray.json._
 import org.scalatest._
@@ -13,12 +15,21 @@ import akka.util.Timeout
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import scala.concurrent.{Future, Promise}
+import com.sksamuel.elastic4s.ElasticDsl._
 
 class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
   import testSystem.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
+
+//    val settings = ImmutableSettings.settingsBuilder().put("cluster.name", "recap-test").build()
+//    val client = ElasticClient.remote(settings, ElasticsearchClientUri("elasticsearch://search-recap-test-25ycxtt6yopl3zms2jpthquvvy.us-east-1.es.amazonaws.com:9300"))
+  val settings = ImmutableSettings.settingsBuilder().put("cluster.name", "elasticsearch_jasonmartens").build()
+  val client = ElasticClient.remote(settings, ElasticsearchClientUri("elasticsearch://localhost:9300"))
+  //  val client = ElasticClient.remote("localhost", 9300)
+  client.execute { create index "requests" }
+  client.execute { create index "responses" }
 
   def getResData(res: HttpResponse): Future[String] = {
     val p = Promise[String]()
@@ -36,7 +47,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   }
 
   describe("Requests") {
-    val request = new Request("httpbin.org")
+    val request = new Request("httpbin.org", client = Some(client))
     it("should be able to GET") {
       ScalaFutures.whenReady(request.get("/get"), timeout(5 seconds), interval(500 millis)) { res =>
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
