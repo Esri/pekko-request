@@ -33,6 +33,7 @@ libraryDependencies ++= {
     "io.dronekit" %% "oauth-headers" % "0.2",
     "org.scalatest" %% "scalatest" % "2.2.4" % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
+    "joda-time" % "joda-time" % "2.8.2"
   )
 }
