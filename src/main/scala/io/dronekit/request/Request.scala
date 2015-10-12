@@ -120,7 +120,8 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
 
   def indexTimeout(requestId: String, metrics: Map[String, String]): Unit = {
     if (client.isDefined) {
-      val indexFuture = client.get.indexDocument("akka-requests", "timeout", None, Map("requestId" -> requestId))
+      val indexFuture = client.get.indexDocument(
+        "akka-requests", "timeout", None, Map("requestId" -> requestId) ++ metrics)
       indexFuture.onComplete {
         case Success(httpResponse) =>
           if (httpResponse.status.intValue() >= 300) adapter.error(s"indexResponse failed: $httpResponse")
