@@ -3,16 +3,19 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
+import akka.util.Timeout
 import io.dronekit.oauth._
 import io.dronekit.request.Request
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{Tag, _}
 import spray.json._
-import org.scalatest._
-import scala.concurrent.Await
-import akka.util.Timeout
+
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, Promise}
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
-import scala.concurrent.{Future, Promise}
+
+object PostTest extends Tag("PostTest")
 
 class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
@@ -24,9 +27,8 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
     val p = Promise[String]()
     val data = res.entity.dataBytes.runWith(Sink.head)
     data.onComplete {
-      case Success(byteSeq) => {
+      case Success(byteSeq) =>
         p.success(byteSeq.map(b => b.toChar).mkString)
-      }
       case Failure(ex) => ex match {
         case ex: java.util.NoSuchElementException => p.success("")
         case _ => p.failure(ex)
@@ -36,8 +38,8 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   }
 
   describe("Requests") {
-    val request = new Request("httpbin.org")
-    it("should be able to GET") {
+    val request = new Request("http://httpbin.org", client = None)
+    it("should be able to GET", PostTest) {
       ScalaFutures.whenReady(request.get("/get"), timeout(5 seconds), interval(500 millis)) { res =>
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
            val jsObj = data.parseJson.asJsObject
@@ -69,19 +71,20 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
     it("should be able to retry on timeout failures") {
       var count = 0
 
-      request.httpTimeout = 1.micro // set super short timeout
+      request.httpTimeout = 0 seconds // set super short timeout
       val req = request.retry(3)(()=>{
           count = count + 1
+          println(s"Retrying request on attempt $count")
           request.get("/get")})
-      ScalaFutures.whenReady(req.failed, timeout(5 seconds), interval(500 millis)) { res =>
-        assert(count == 4) // 4 tries in total, 3 retries + 1 original try
-        res shouldBe an [TimeoutException]
+      intercept[TimeoutException] {
+        Await.result(req, 5 seconds)
       }
+      count shouldBe 4
     }
   }
 
    describe("Oauth") {
-     val baseUri = "oauthbin.com"
+     val baseUri = "http://oauthbin.com"
      val request = new Request(baseUri)
 
      describe("when it has a key and secret") {

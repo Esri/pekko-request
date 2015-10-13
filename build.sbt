@@ -2,12 +2,12 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "0.2.3"
+version := "0.3.0"
 scalaVersion := "2.11.7"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
 
-credentials += Credentials("Artifactory Realm", "dronekit.artifactoryonline.com", "publish", "Km4-PSH-aEM-6Fm")
+credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 isSnapshot := true
 publishTo := {
   val artifactory = "https://dronekit.artifactoryonline.com/"
@@ -33,6 +33,7 @@ libraryDependencies ++= {
     "io.dronekit" %% "oauth-headers" % "0.2",
     "org.scalatest" %% "scalatest" % "2.2.4" % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
+    "joda-time" % "joda-time" % "2.8.2"
   )
 }

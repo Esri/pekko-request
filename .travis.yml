@@ -1,6 +1,8 @@
 language: scala
 scala:
-  - 2.11.2
+  - 2.11.7
+jdk:
+  - oraclejdk8
 
 install:
   # do install steps here
@@ -8,4 +10,4 @@ install:
 
 script:
   # do script steps here
-  - sbt ++$TRAVIS_SCALA_VERSION test
+  - sbt 'set credentials += Credentials("Artifactory Realm", "dronekit.artifactoryonline.com", System.getenv("ARTIFACTORY_USER"), System.getenv("ARTIFACTORY_PASSWORD"))' ++$TRAVIS_SCALA_VERSION test
