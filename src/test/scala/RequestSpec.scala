@@ -5,13 +5,14 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.util.Timeout
 import io.dronekit.oauth._
-import io.dronekit.request.{ESHttpClient, Request}
-import org.scalatest.{Tag, _}
+import io.dronekit.request.Request
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{Tag, _}
 import spray.json._
 
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{Await, Future, Promise}
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 object PostTest extends Tag("PostTest")
@@ -21,14 +22,13 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   import testSystem.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
-  
+
   def getResData(res: HttpResponse): Future[String] = {
     val p = Promise[String]()
     val data = res.entity.dataBytes.runWith(Sink.head)
     data.onComplete {
-      case Success(byteSeq) => {
+      case Success(byteSeq) =>
         p.success(byteSeq.map(b => b.toChar).mkString)
-      }
       case Failure(ex) => ex match {
         case ex: java.util.NoSuchElementException => p.success("")
         case _ => p.failure(ex)
@@ -71,14 +71,15 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
     it("should be able to retry on timeout failures") {
       var count = 0
 
-      request.httpTimeout = 1.micro // set super short timeout
+      request.httpTimeout = 0 seconds // set super short timeout
       val req = request.retry(3)(()=>{
           count = count + 1
+          println(s"Retrying request on attempt $count")
           request.get("/get")})
-      ScalaFutures.whenReady(req.failed, timeout(5 seconds), interval(500 millis)) { res =>
-        assert(count == 4) // 4 tries in total, 3 retries + 1 original try
-        res shouldBe an [TimeoutException]
+      intercept[TimeoutException] {
+        Await.result(req, 5 seconds)
       }
+      count shouldBe 4
     }
   }
 
