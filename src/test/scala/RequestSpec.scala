@@ -21,9 +21,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   import testSystem.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
-
-  val client = new ESHttpClient("http://localhost:9200")
-
+  
   def getResData(res: HttpResponse): Future[String] = {
     val p = Promise[String]()
     val data = res.entity.dataBytes.runWith(Sink.head)
@@ -40,7 +38,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   }
 
   describe("Requests") {
-    val request = new Request("http://httpbin.org", client = Some(client))
+    val request = new Request("http://httpbin.org", client = None)
     it("should be able to GET", PostTest) {
       ScalaFutures.whenReady(request.get("/get"), timeout(5 seconds), interval(500 millis)) { res =>
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
