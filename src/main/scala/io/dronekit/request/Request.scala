@@ -200,6 +200,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
 
     val requestID = java.util.UUID.randomUUID()
     val request = HttpRequest(uri = uri + queryParams, method=method, headers=headers)
+
     requestFlow(request, requestID.toString, metrics)
   }
 
@@ -240,6 +241,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
       entity = entity)
 
     val requestID = java.util.UUID.randomUUID()
+
     requestFlow(postRequest, requestID.toString, metrics)
   }
 

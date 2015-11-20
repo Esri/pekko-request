@@ -1,4 +1,4 @@
-enablePlugins(JavaAppPackaging)
+//enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
@@ -31,6 +31,7 @@ libraryDependencies ++= {
     "commons-codec" % "commons-codec" % "1.6",
     "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
     "io.dronekit" %% "oauth-headers" % "0.2",
+    "io.dronekit" %% "akkahttpawsauth" % "1.0",
     "org.scalatest" %% "scalatest" % "2.2.4" % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
