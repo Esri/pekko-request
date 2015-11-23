@@ -8,7 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.pattern.after
-import akka.stream.ActorMaterializer
+import akka.stream.{FlowShape, ActorMaterializer}
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import io.dronekit.oauth._
@@ -132,26 +132,27 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   }
 
   def entityFlow(message: LogMessage, metrics: Map[String, String]): Flow[ByteString, ByteString, Any] = {
-    Flow() {implicit b =>
-      import FlowGraph.Implicits._
+    Flow.fromGraph(
+      FlowGraph.create() {implicit b =>
+        import FlowGraph.Implicits._
 
-      val indexSink = message match {
-       case req: RequestLog => {
-         b.add(Sink.foreach[ByteString]{bs =>
-         indexRequest(req.copy(data = bs.utf8String), metrics)
-         })
+        val indexSink = message match {
+          case req: RequestLog =>
+            b.add(Sink.foreach[ByteString]{bs =>
+              indexRequest(req.copy(data = bs.utf8String), metrics)
+              })
+          case resp: ResponseLog =>
+            b.add(Sink.foreach[ByteString]{bs =>
+              indexResponse(resp.copy(data = bs.utf8String), metrics)
+              })
         }
-        case resp: ResponseLog => {
-          b.add(Sink.foreach[ByteString]{bs =>
-          indexResponse(resp.copy(data = bs.utf8String), metrics)
-          })
-        }
+
+        val entityBroadcast = b.add(Broadcast[ByteString](2))
+        entityBroadcast.out(0) ~> indexSink
+        (entityBroadcast.in, entityBroadcast.out(1))
+        FlowShape(entityBroadcast.in, entityBroadcast.out(1))
       }
-
-      val entityBroadcast = b.add(Broadcast[ByteString](2))
-      entityBroadcast.out(0) ~> indexSink
-      (entityBroadcast.in, entityBroadcast.out(1))
-    }
+    )
   }
 
 
