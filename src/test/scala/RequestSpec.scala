@@ -4,8 +4,9 @@ import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl._
 import akka.util.Timeout
+import io.dronekit.cloud.utils.Config._
 import io.dronekit.oauth._
-import io.dronekit.request.Request
+import io.dronekit.request.{ESHttpClient, Request}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Tag, _}
 import spray.json._
@@ -23,6 +24,12 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
 
+  val accessKeyId = awsConfig.getString("accessKeyID")
+  val region = awsConfig.getString("region")
+  val kSecret = awsConfig.getString("kSecret")
+  val endpoint = awsConfig.getString("URI")
+  val service = awsConfig.getString("service")
+
   def getResData(res: HttpResponse): Future[String] = {
     val p = Promise[String]()
     val data = res.entity.dataBytes.runWith(Sink.head)
@@ -38,7 +45,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   }
 
   describe("Requests") {
-    val request = new Request("http://httpbin.org", client = None)
+    val request = new Request("http://httpbin.org", client = Option(new ESHttpClient(endpoint, kSecret, region, accessKeyId, service)))
     it("should be able to GET", PostTest) {
       ScalaFutures.whenReady(request.get("/get"), timeout(5 seconds), interval(500 millis)) { res =>
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
@@ -59,7 +66,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
                                 |{"Content-Length":"12","Accept":"*/*",
                                 |"Content-Type":"application/json",
                                 |"User-Agent":"akka-http/2.3.12",
-                                |"Host":"httpbin.org"}""".stripMargin.replace("\n", "")
+                                |"Host":"httpbin.org"}""".stripMargin.replaceAll("\r", "").stripMargin.replace("\n", "")
           assert(jsObj.fields("headers").toString === controlHeader)
           assert(jsObj.fields("url").toString === """"http://httpbin.org/post"""")
           assert(jsObj.fields("args").toString === """{}""")
