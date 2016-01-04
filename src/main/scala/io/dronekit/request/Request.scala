@@ -133,8 +133,8 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
 
   def entityFlow(message: LogMessage, metrics: Map[String, String]): Flow[ByteString, ByteString, Any] = {
     Flow.fromGraph(
-      FlowGraph.create() {implicit b =>
-        import FlowGraph.Implicits._
+      GraphDSL.create() {implicit b =>
+        import GraphDSL.Implicits._
 
         val indexSink = message match {
           case req: RequestLog =>
@@ -227,7 +227,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
       // application/x-www-form-urlencoded
       val paramStr = ByteString(getFormURLEncoded(params))
       HttpEntity(
-        contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`),
+        contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
         contentLength = paramStr.length,
         Source(List(paramStr)))
     } else {
