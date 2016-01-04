@@ -71,7 +71,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
     it("should be able to retry on timeout failures") {
       var count = 0
 
-      request.httpTimeout = 0 seconds // set super short timeout
+      request.httpTimeout = 1 millisecond // set super short timeout
       val req = request.retry(3)(()=>{
           count = count + 1
           println(s"Retrying request on attempt $count")
