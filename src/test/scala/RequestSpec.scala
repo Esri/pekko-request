@@ -77,7 +77,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
           println(s"Retrying request on attempt $count")
           request.get("/get")})
       intercept[TimeoutException] {
-        Await.result(req, 5 seconds)
+        Await.result(req, 20 seconds)
       }
       count shouldBe 4
     }
