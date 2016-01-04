@@ -2,7 +2,7 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "0.3.1"
+version := "2.2"
 scalaVersion := "2.11.7"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
@@ -18,8 +18,8 @@ publishTo := {
 }
 
 libraryDependencies ++= {
-  val akkaV = "2.3.12"
-  val akkaStreamV = "1.0"
+  val akkaV = "2.4.1"
+  val akkaStreamV = "2.0.1"
   val scalaTestV = "2.2.4"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
@@ -27,11 +27,11 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http-core-experimental" % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-experimental" % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaStreamV,
+    "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
     "io.spray" %%  "spray-json" % "1.3.2",
     "commons-codec" % "commons-codec" % "1.6",
-    "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
     "io.dronekit" %% "oauth-headers" % "0.2",
-    "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+    "org.scalatest" %% "scalatest" % scalaTestV % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
     "joda-time" % "joda-time" % "2.8.2"

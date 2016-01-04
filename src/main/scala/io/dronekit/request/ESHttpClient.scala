@@ -52,7 +52,8 @@ class ESHttpClient(endpoint: String)(implicit system: ActorSystem, materializer:
     import DefaultJsonProtocol._
     // Elasticsearch takes json-formatted parameters with x-www-form-urlencoded which is brain-dead
     val paramStr = data.toJson.compactPrint
-    val entity = HttpEntity(contentType = MediaTypes.`application/x-www-form-urlencoded`, paramStr)
+    val contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`)
+    val entity = HttpEntity(contentType = contentType, paramStr)
     val request = HttpRequest(method = HttpMethods.POST, uri = uri, entity = entity)
     Source.single(request).via(outgoingConn).runWith(Sink.head)
   }
