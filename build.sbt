@@ -2,7 +2,7 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "2.2"
+version := "2.2.1"
 scalaVersion := "2.11.7"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
@@ -30,7 +30,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
     "io.spray" %%  "spray-json" % "1.3.2",
     "commons-codec" % "commons-codec" % "1.6",
-    "io.dronekit" %% "oauth-headers" % "0.2",
+    "io.dronekit" %% "oauth-headers" % "0.3",
     "org.scalatest" %% "scalatest" % scalaTestV % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
