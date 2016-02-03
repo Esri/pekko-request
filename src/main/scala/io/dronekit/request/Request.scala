@@ -212,7 +212,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
     if (oauth.hasKeys && !oauth.canSignRequests) {
       if (oauth.authProgress == AuthProgress.Unauthenticated) {
         headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader(baseUri+uri)), RawHeader("Accept", "*/*"))
-      } else if (oauth.authProgress == AuthProgress.HasRequestTokens) {
+      } else if (oauth.authProgress == AuthProgress.HasRequestTokens || oauth.authProgress == AuthProgress.RequestRefreshTokens) {
         headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader(baseUri+uri)), RawHeader("Accept", "*/*"))
       }
     } else if (oauth.canSignRequests) {
