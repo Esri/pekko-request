@@ -17,11 +17,18 @@ import scala.util.{Failure, Success}
 
 object PostTest extends Tag("PostTest")
 
+case class TestObj(name: String, age: Int)
+
+object TestProtocol extends DefaultJsonProtocol {
+  implicit val testObjFormat = jsonFormat2(TestObj.apply)
+}
+
 class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
   import testSystem.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
+  import TestProtocol._
 
   def getResData(res: HttpResponse): Future[String] = {
     val p = Promise[String]()
@@ -67,6 +74,17 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
         }
       }
     }
+
+   it("should be able to POST a json body") {
+     val testObj = TestObj("Marqod",222)
+     ScalaFutures.whenReady(request.post("/post", json=true, body=Some(testObj.toJson.toString)), timeout(5 seconds), interval(500 millis)) { res =>
+       ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
+        val jsObj = data.parseJson.asJsObject
+        val tObj = jsObj.fields("json").asJsObject.convertTo[TestObj]
+        assert(tObj.name == testObj.name && tObj.age == testObj.age)
+       }
+     }
+   }
 
     it("should be able to retry on timeout failures") {
       var count = 0

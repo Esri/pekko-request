@@ -205,7 +205,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   }
 
   def post(uri: String, params: Map[String, String] = Map(), oauth: Oauth=new Oauth("", ""), json: Boolean = true,
-           metrics: Map[String, String] = Map()): Future[HttpResponse] = {
+           metrics: Map[String, String] = Map(), body: Option[String] = None): Future[HttpResponse] = {
 
     var headers = List(RawHeader("Accept", "*/*"))
 
@@ -230,6 +230,10 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
         contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
         contentLength = paramStr.length,
         Source(List(paramStr)))
+    } else if (body.isDefined) {
+      val bodyStr = ByteString(body.get)
+      val cType = if (json) ContentTypes.`application/json` else ContentTypes.`text/plain(UTF-8)`
+      HttpEntity(contentType=cType, contentLength=bodyStr.length, Source(List(bodyStr)))
     } else {
       HttpEntity.Empty
     }
