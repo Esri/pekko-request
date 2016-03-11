@@ -38,7 +38,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   private val httpScheme = if (uri.getScheme == null) "https" else uri.getScheme
   private val port = if (uri.getPort == -1) (if (httpScheme == "http") 80 else 443) else uri.getPort
   private val _outgoingConn = if (httpScheme == "https") {
-    Http().outgoingConnectionTls(hostname, port)
+    Http().outgoingConnectionHttps(hostname, port)
   } else {
     Http().outgoingConnection(hostname, port)
   }
