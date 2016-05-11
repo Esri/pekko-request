@@ -2,8 +2,8 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "2.2.2"
-scalaVersion := "2.11.7"
+version := "2.3.0"
+scalaVersion := "2.11.8"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
 
@@ -18,16 +18,15 @@ publishTo := {
 }
 
 libraryDependencies ++= {
-  val akkaV = "2.4.1"
-  val akkaStreamV = "2.0.1"
-  val scalaTestV = "2.2.4"
+  val akkaV = "2.4.4"
+  val scalaTestV = "2.2.6"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
-    "com.typesafe.akka" %% "akka-stream-experimental" % akkaStreamV,
-    "com.typesafe.akka" %% "akka-http-core-experimental" % akkaStreamV,
-    "com.typesafe.akka" %% "akka-http-experimental" % akkaStreamV,
-    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaStreamV,
-    "com.typesafe.akka" %% "akka-http-testkit-experimental" % akkaStreamV,
+    "com.typesafe.akka" %% "akka-stream" % akkaV,
+    "com.typesafe.akka" %% "akka-http-core" % akkaV,
+    "com.typesafe.akka" %% "akka-http-testkit" % akkaV,
+    "com.typesafe.akka" %% "akka-http-experimental" % akkaV,
+    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaV,
     "io.spray" %%  "spray-json" % "1.3.2",
     "commons-codec" % "commons-codec" % "1.6",
     "io.dronekit" %% "oauth-headers" % "0.3",

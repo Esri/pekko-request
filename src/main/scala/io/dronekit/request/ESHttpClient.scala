@@ -37,7 +37,7 @@ class ESHttpClient(endpoint: String)(implicit system: ActorSystem, materializer:
 
   val uri = java.net.URI.create(endpoint)
   private val outgoingConn = if (uri.getScheme() == "https") {
-    Http().outgoingConnectionTls(uri.getHost, if (uri.getPort == -1) 443 else uri.getPort)
+    Http().outgoingConnectionHttps(uri.getHost, if (uri.getPort == -1) 443 else uri.getPort)
   } else {
     Http().outgoingConnection(uri.getHost, if (uri.getPort == -1) 80 else uri.getPort)
   }
