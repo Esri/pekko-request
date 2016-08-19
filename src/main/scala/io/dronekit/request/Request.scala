@@ -99,13 +99,13 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
     adapter.debug(s"${req.requestId}:${req.method}:${req.url}:${req.data}")
   }
 
-  def indexResponse(resp: ResponseLog, metrics: Map[String, String]): Unit = {
+  def indexResponse(resp: ResponseLog, metrics: Map[String, Any]): Unit = {
     if (client.isDefined) {
-      val data = Map[String, String](
+      val data = Map[String, Any](
         "timestamp" -> resp.timestamp.toString(dateTimeFormatter),
         "requestId" -> resp.requestId,
         "status" -> resp.status,
-        "latency" -> resp.latency.toString,
+        "latency" -> resp.latency,
         "data" -> resp.data
       ) ++ metrics
       val indexFuture = client.get.indexDocument("akka-requests", "response", None, data)
@@ -120,8 +120,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
 
   def indexTimeout(requestId: String, metrics: Map[String, String]): Unit = {
     if (client.isDefined) {
-      val indexFuture = client.get.indexDocument(
-        "akka-requests", "timeout", None, Map("requestId" -> requestId) ++ metrics)
+      val indexFuture = client.get.indexDocument("akka-requests", "timeout", None, Map("requestId" -> requestId) ++ metrics)
       indexFuture.onComplete {
         case Success(httpResponse) =>
           if (httpResponse.status.intValue() >= 300) adapter.error(s"indexResponse failed: $httpResponse")
