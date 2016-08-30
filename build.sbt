@@ -2,7 +2,7 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "2.4.0"
+version := "2.4.1"
 scalaVersion := "2.11.8"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
@@ -18,7 +18,7 @@ publishTo := {
 }
 
 libraryDependencies ++= {
-  val akkaV = "2.4.4"
+  val akkaV = "2.4.9"
   val scalaTestV = "2.2.6"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
