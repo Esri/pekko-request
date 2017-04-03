@@ -50,7 +50,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
       ScalaFutures.whenReady(request.get("/get"), timeout(5 seconds), interval(500 millis)) { res =>
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
            val jsObj = data.parseJson.asJsObject
-           assert(jsObj.fields("headers").toString == """{"Accept":"*/*","Host":"httpbin.org","User-Agent":"akka-http/2.4.9"}""")
+           assert(jsObj.fields("headers").toString == """{"Accept":"*/*","Connection":"close","Host":"httpbin.org","User-Agent":"akka-http/2.4.9"}""")
            assert(jsObj.fields("url").toString == """"http://httpbin.org/get"""")
            assert(jsObj.fields("args").toString == """{}""")
         }
@@ -62,11 +62,7 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
         ScalaFutures.whenReady(getResData(res), timeout(5 seconds), interval(500 millis)) { data =>
           val jsObj = data.parseJson.asJsObject
           // make sure that the url, args, and headers are correct
-          val controlHeader = """
-                                |{"Content-Length":"12","Accept":"*/*",
-                                |"Content-Type":"application/json",
-                                |"User-Agent":"akka-http/2.4.9",
-                                |"Host":"httpbin.org"}""".stripMargin.replace("\n", "")
+          val controlHeader = """{"Connection":"close","Content-Length":"12","Accept":"*/*","Content-Type":"application/json","User-Agent":"akka-http/2.4.9","Host":"httpbin.org"}"""
           assert(jsObj.fields("headers").toString === controlHeader)
           assert(jsObj.fields("url").toString === """"http://httpbin.org/post"""")
           assert(jsObj.fields("args").toString === """{}""")
