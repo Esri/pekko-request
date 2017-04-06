@@ -50,23 +50,15 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None)(implicit mat
     }.mkString("&")
   }
 
-  def retry(retries: Int = 3)(req:() => Future[HttpResponse]): Future[HttpResponse] = {
-    val p = Promise[HttpResponse]()
+  def retry[T](retries: Int = 3)(req: => Future[T]): Future[T] = {
+    val p = Promise[T]()
 
     def retryHelper(retryNum: Int = retries): Unit = {
       // catch timeout errors
-      req().onComplete{
+      req.onComplete{
         case Success(v) => p.success(v)
-        case Failure(ex) => ex match {
-          case ex: TimeoutException => {
-            if (retryNum <= 0) {
-              p.failure(ex)
-            } else {
-              retryHelper(retryNum - 1)
-            }
-          }
-          case _ => p.failure(ex)
-        }
+        case Failure(ex: TimeoutException) if retryNum > 0 => retryHelper(retryNum - 1)
+        case Failure(ex) => p.failure(ex)
       }
     }
 
@@ -167,7 +159,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None)(implicit mat
 
     Future.firstCompletedOf(
       List(resp,
-        after(httpTimeout, system.scheduler)(Future {indexTimeout(requestId, metrics); throw new TimeoutException})))
+        after(httpTimeout, system.scheduler)(Future.failed(new TimeoutException) )))
   }
 
   def get(uri: String, params: Map[String, String] = Map(), method: HttpMethod=HttpMethods.GET,
