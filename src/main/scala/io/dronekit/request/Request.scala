@@ -1,5 +1,6 @@
 package io.dronekit.request
 
+import java.time.{Instant, Duration => JavaDuration}
 import java.util.concurrent.TimeoutException
 
 import akka.actor.ActorSystem
@@ -8,11 +9,10 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
 import akka.pattern.after
-import akka.stream.{FlowShape, ActorMaterializer}
 import akka.stream.scaladsl._
+import akka.stream.{ActorMaterializer, FlowShape}
 import akka.util.ByteString
 import io.dronekit.oauth._
-import org.joda._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 
@@ -32,9 +32,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   implicit val materializer = ActorMaterializer()
   implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
 
-  val dateTimeFormatter = time.format.ISODateTimeFormat.dateTime()
-
-  private val hostname = uri.getHost()
+  private val hostname = uri.getHost
   private val httpScheme = if (uri.getScheme == null) "https" else uri.getScheme
   private val port = if (uri.getPort == -1) (if (httpScheme == "http") 80 else 443) else uri.getPort
   private val _outgoingConn = if (httpScheme == "https") {
@@ -77,13 +75,13 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   }
 
   sealed trait LogMessage
-  sealed case class RequestLog(requestId: String, url: String, method: String, data: String, timestamp: time.DateTime) extends LogMessage
-  sealed case class ResponseLog(requestId: String, status: String, data: String, timestamp: time.DateTime, latency: Long) extends LogMessage
+  sealed case class RequestLog(requestId: String, url: String, method: String, data: String, timestamp: Instant) extends LogMessage
+  sealed case class ResponseLog(requestId: String, status: String, data: String, timestamp: Instant, latency: Long) extends LogMessage
 
   def indexRequest(req: RequestLog, metrics: Map[String, String]): Unit = {
     if (client.isDefined) {
       val data = Map(
-        "timestamp" -> req.timestamp.toString(dateTimeFormatter),
+        "timestamp" -> req.timestamp.toString,
         "requestId" -> req.requestId,
         "url" -> req.url,
         "method" -> req.method,
@@ -102,7 +100,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   def indexResponse(resp: ResponseLog, metrics: Map[String, Any]): Unit = {
     if (client.isDefined) {
       val data = Map[String, Any](
-        "timestamp" -> resp.timestamp.toString(dateTimeFormatter),
+        "timestamp" -> resp.timestamp.toString,
         "requestId" -> resp.requestId,
         "status" -> resp.status,
         "latency" -> resp.latency,
@@ -157,7 +155,7 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
 
   def requestFlow(request: HttpRequest, requestId: String, metrics: Map[String, String]): Future[HttpResponse] = {
     val requestLog = RequestLog(requestId = requestId.toString, url = request.getUri().toString,
-      method = request.method.name, data = "", timestamp = new time.DateTime())
+      method = request.method.name, data = "", timestamp = Instant.now())
     val newRequest = if (request.entity.isKnownEmpty()) {
 
       indexRequest(requestLog, metrics)
@@ -167,8 +165,8 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
       request.copy(entity = request.entity.transformDataBytes(entityFlow(requestLog, metrics)))
     val resp = Source.single(newRequest).via(_outgoingConn)
       .map{response =>
-        val now = new time.DateTime()
-        val latency = new time.Duration(requestLog.timestamp, now).getMillis
+        val now = Instant.now()
+        val latency: Long = JavaDuration.between(requestLog.timestamp, now).toMillis
         val responseLog = ResponseLog(requestId = requestId, status = response.status.intValue().toString, data = "", timestamp = now, latency = latency)
         response.copy(entity = response.entity.transformDataBytes(entityFlow(responseLog, metrics)))}
       .runWith(Sink.head)

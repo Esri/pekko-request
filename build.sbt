@@ -2,7 +2,7 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "2.4.1"
+version := "2.5.0"
 scalaVersion := "2.11.8"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
