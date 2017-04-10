@@ -24,12 +24,10 @@ import scala.util.{Failure, Success}
 
 class RequestException(msg: String) extends RuntimeException(msg)
 
-class Request(baseUri: String, client: Option[ESHttpClient] = None) {
+class Request(baseUri: String, client: Option[ESHttpClient] = None)(implicit materializer: ActorMaterializer, system: ActorSystem) {
   require(baseUri.startsWith("http"))
   val uri = java.net.URI.create(baseUri)
   var httpTimeout = 60.seconds
-  implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
   implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
 
   private val hostname = uri.getHost
@@ -156,13 +154,14 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None) {
   def requestFlow(request: HttpRequest, requestId: String, metrics: Map[String, String]): Future[HttpResponse] = {
     val requestLog = RequestLog(requestId = requestId.toString, url = request.getUri().toString,
       method = request.method.name, data = "", timestamp = Instant.now())
+      
     val newRequest = if (request.entity.isKnownEmpty()) {
-
       indexRequest(requestLog, metrics)
-    request
-    }
-    else
+      request
+    } else {
       request.copy(entity = request.entity.transformDataBytes(entityFlow(requestLog, metrics)))
+    }
+
     val resp = Source.single(newRequest).via(_outgoingConn)
       .map{response =>
         val now = Instant.now()
