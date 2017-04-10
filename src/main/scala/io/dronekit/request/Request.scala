@@ -156,8 +156,15 @@ class Request(baseUri: String, client: Option[ESHttpClient] = None)(implicit mat
   def requestFlow(request: HttpRequest, requestId: String, metrics: Map[String, String]): Future[HttpResponse] = {
     val requestLog = RequestLog(requestId = requestId.toString, url = request.getUri().toString,
       method = request.method.name, data = "", timestamp = new time.DateTime())
+      
+    val newRequest = if (request.entity.isKnownEmpty()) {
+      indexRequest(requestLog, metrics)
+      request
+    } else {
+      request.copy(entity = request.entity.transformDataBytes(entityFlow(requestLog, metrics)))
+    }
 
-    val resp = Source.single(request).via(_outgoingConn)
+    val resp = Source.single(newRequest).via(_outgoingConn)
       .map{response =>
         val now = new time.DateTime()
         val latency = new time.Duration(requestLog.timestamp, now).getMillis
