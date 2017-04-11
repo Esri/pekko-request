@@ -4,17 +4,15 @@ import java.time.{Instant, Duration => JavaDuration}
 import java.util.concurrent.TimeoutException
 
 import akka.actor.ActorSystem
-import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
-import akka.pattern.after
 import akka.stream.scaladsl._
-import akka.stream.{ActorMaterializer, FlowShape}
+import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.dronekit.oauth._
-import spray.json.DefaultJsonProtocol._
-import spray.json._
+import akka.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
+import akka.http.scaladsl.marshalling.{ Marshal, Marshaller }
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,228 +20,204 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class RequestException(msg: String) extends RuntimeException(msg)
+trait RequestLogger {
+  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration)
+  def logTimeout(request: HttpRequest)
+}
 
-class Request(baseUri: String, client: Option[ESHttpClient] = None)(implicit materializer: ActorMaterializer, system: ActorSystem) {
-  require(baseUri.startsWith("http"))
-  val uri = java.net.URI.create(baseUri)
-  var httpTimeout = 60.seconds
-  implicit val adapter: LoggingAdapter = Logging(system, "AkkaRequest")
+object NullLogger extends RequestLogger {
+  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration) = {}
+  def logTimeout(request: HttpRequest) = {}
+}
 
-  private val hostname = uri.getHost
-  private val httpScheme = if (uri.getScheme == null) "https" else uri.getScheme
-  private val port = if (uri.getPort == -1) (if (httpScheme == "http") 80 else 443) else uri.getPort
-  private val _outgoingConn = if (httpScheme == "https") {
-    Http().outgoingConnectionHttps(hostname, port)
-  } else {
-    Http().outgoingConnection(hostname, port)
+object PrintLogger extends RequestLogger {  
+  def printEntity(entity: HttpEntity) = {
+    if (!entity.isKnownEmpty) {
+      val lenStr = entity.contentLengthOption.map(l => s"${l} bytes").getOrElse("unknown size")
+      entity.contentType match {
+        case ct: ContentType.Binary => println(s"\t(${ct}, ${lenStr})")
+        case ct: ContentType.NonBinary => {
+          entity match {
+            case strict: HttpEntity.Strict => {
+              val s = strict.data.decodeString(ct.charset.value)
+              if (!s.isEmpty) {
+                println("\t| " + s.replace("\n", "\n\t| "))
+              }
+            }
+            case ct => println(s"\t(${ct}, ${lenStr})")
+          }
+        }
+      }
+    }
   }
-
-  def byteStringToString(data: ByteString): String = data.map(_.toChar).mkString
-
-  private def getFormURLEncoded(params: Map[String, String]): String = {
-    val sortedParams = SortedMap(params.toList:_*)
-    sortedParams.map { paramTuple =>
-      java.net.URLEncoder.encode(paramTuple._1, "UTF-8") + "=" + java.net.URLEncoder.encode(paramTuple._2, "UTF-8")
-    }.mkString("&")
+  
+  def logRequest(request: HttpRequest) = {
+    println(s"<~ ${request.method.value} ${request.getUri}")
+    printEntity(request.entity)
   }
+  
+  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration) = {
+    logRequest(request)
+    println(s"~> ${response.status} in ${latency.toMillis}ms")
+    printEntity(response.entity)
+  }
+  
+  def logTimeout(request: HttpRequest) = {
+    logRequest(request)
+    println(s"~! request timed out")
+  }
+}
 
-  def retry(retries: Int = 3)(req:() => Future[HttpResponse]): Future[HttpResponse] = {
-    val p = Promise[HttpResponse]()
+object Client {
+  def apply(baseUri: String, logger: RequestLogger = NullLogger)
+    (implicit materializer: ActorMaterializer, system: ActorSystem) = {
+    require(baseUri.startsWith("http"))
+    val uri = java.net.URI.create(baseUri)
+    var httpTimeout = 60.seconds
+    val hostname = uri.getHost
+    val httpScheme = if (uri.getScheme == null) "https" else uri.getScheme
+    val port = if (uri.getPort == -1) (if (httpScheme == "http") 80 else 443) else uri.getPort
+    val outgoingConn = if (httpScheme == "https") {
+      Http().outgoingConnectionHttps(hostname, port)
+    } else {
+      Http().outgoingConnection(hostname, port)
+    }
+    
+    new Client(baseUri, outgoingConn, logger)
+  }
+  
+  def retry[T](retries: Int = 3)(req: => Future[T]): Future[T] = {
+    val p = Promise[T]()
 
     def retryHelper(retryNum: Int = retries): Unit = {
       // catch timeout errors
-      req().onComplete{
+      req.onComplete{
         case Success(v) => p.success(v)
-        case Failure(ex) => ex match {
-          case ex: TimeoutException => {
-            if (retryNum <= 0) {
-              p.failure(ex)
-            } else {
-              retryHelper(retryNum - 1)
-            }
-          }
-          case _ => p.failure(ex)
-        }
+        case Failure(ex: TimeoutException) if retryNum > 0 => retryHelper(retryNum - 1)
+        case Failure(ex) => p.failure(ex)
       }
     }
 
     retryHelper()
     p.future
   }
+}
 
-  sealed trait LogMessage
-  sealed case class RequestLog(requestId: String, url: String, method: String, data: String, timestamp: Instant) extends LogMessage
-  sealed case class ResponseLog(requestId: String, status: String, data: String, timestamp: Instant, latency: Long) extends LogMessage
+case class ClientRequestError(status: StatusCode, body: ByteString) extends RuntimeException(s"Request failed with status ${status}: ${body}")
 
-  def indexRequest(req: RequestLog, metrics: Map[String, String]): Unit = {
-    if (client.isDefined) {
-      val data = Map(
-        "timestamp" -> req.timestamp.toString,
-        "requestId" -> req.requestId,
-        "url" -> req.url,
-        "method" -> req.method,
-        "data" -> req.data
-      ) ++ metrics
-      val indexFuture = client.get.indexDocument("akka-requests", "request", None, data)
-      indexFuture.onComplete {
-        case Success(httpResponse) =>
-          if (httpResponse.status.intValue() >= 300) adapter.error(s"indexRequest failed: $httpResponse")
-        case Failure(ex) => adapter.error(ex, "Failed to save request to Elasticsearch")
-      }
-    }
-    adapter.debug(s"${req.requestId}:${req.method}:${req.url}:${req.data}")
+final class Client(
+  val baseUri: String,
+  val outgoingConn: Flow[HttpRequest, HttpResponse, Any],
+  val logger: RequestLogger = NullLogger,
+  val timeout: FiniteDuration = 60.seconds,
+  val oauth: Oauth = new Oauth("", ""))
+  (implicit materializer: ActorMaterializer, system: ActorSystem) {
+  
+  def withOauth(newOauth: Oauth) = {
+    new Client(baseUri, outgoingConn, logger, timeout, newOauth)
   }
-
-  def indexResponse(resp: ResponseLog, metrics: Map[String, Any]): Unit = {
-    if (client.isDefined) {
-      val data = Map[String, Any](
-        "timestamp" -> resp.timestamp.toString,
-        "requestId" -> resp.requestId,
-        "status" -> resp.status,
-        "latency" -> resp.latency,
-        "data" -> resp.data
-      ) ++ metrics
-      val indexFuture = client.get.indexDocument("akka-requests", "response", None, data)
-      indexFuture.onComplete {
-        case Success(httpResponse) =>
-          if (httpResponse.status.intValue() >= 300) adapter.error(s"indexResponse failed: $httpResponse")
-        case Failure(ex) => adapter.error(ex, "Failed to save response to Elasticsearch")
-      }
-    }
-    adapter.debug(s"Response:${resp.requestId}:${resp.status}:${resp.timestamp}\n${resp.data}")
+  
+  def withTimeout(newTimeout: FiniteDuration) = {
+    new Client(baseUri, outgoingConn, logger, newTimeout, oauth)
   }
-
-  def indexTimeout(requestId: String, metrics: Map[String, String]): Unit = {
-    if (client.isDefined) {
-      val indexFuture = client.get.indexDocument("akka-requests", "timeout", None, Map("requestId" -> requestId) ++ metrics)
-      indexFuture.onComplete {
-        case Success(httpResponse) =>
-          if (httpResponse.status.intValue() >= 300) adapter.error(s"indexResponse failed: $httpResponse")
-        case Failure(ex) => adapter.error(ex, "Failed to save response to Elasticsearch")
-      }
-    }
-    adapter.debug(s"Timeout:$requestId")
+  
+  var defaultHeaders = List(RawHeader("Accept", "*/*"))
+  
+  private def getFormURLEncoded(params: Map[String, String]): String = {
+    val sortedParams = SortedMap(params.toList:_*)
+    sortedParams.map { paramTuple =>
+      java.net.URLEncoder.encode(paramTuple._1, "UTF-8") + "=" + java.net.URLEncoder.encode(paramTuple._2, "UTF-8")
+    }.mkString("&")
   }
-
-  def entityFlow(message: LogMessage, metrics: Map[String, String]): Flow[ByteString, ByteString, Any] = {
-    Flow.fromGraph(
-      GraphDSL.create() {implicit b =>
-        import GraphDSL.Implicits._
-
-        val indexSink = message match {
-          case req: RequestLog =>
-            b.add(Sink.foreach[ByteString]{bs =>
-              indexRequest(req.copy(data = bs.utf8String), metrics)
-              })
-          case resp: ResponseLog =>
-            b.add(Sink.foreach[ByteString]{bs =>
-              indexResponse(resp.copy(data = bs.utf8String), metrics)
-              })
-        }
-
-        val entityBroadcast = b.add(Broadcast[ByteString](2))
-        entityBroadcast.out(0) ~> indexSink
-        (entityBroadcast.in, entityBroadcast.out(1))
-        FlowShape(entityBroadcast.in, entityBroadcast.out(1))
-      }
-    )
-  }
-
-
-  def requestFlow(request: HttpRequest, requestId: String, metrics: Map[String, String]): Future[HttpResponse] = {
-    val requestLog = RequestLog(requestId = requestId.toString, url = request.getUri().toString,
-      method = request.method.name, data = "", timestamp = Instant.now())
-      
-    val newRequest = if (request.entity.isKnownEmpty()) {
-      indexRequest(requestLog, metrics)
-      request
-    } else {
-      request.copy(entity = request.entity.transformDataBytes(entityFlow(requestLog, metrics)))
-    }
-
-    val resp = Source.single(newRequest).via(_outgoingConn)
-      .map{response =>
-        val now = Instant.now()
-        val latency: Long = JavaDuration.between(requestLog.timestamp, now).toMillis
-        val responseLog = ResponseLog(requestId = requestId, status = response.status.intValue().toString, data = "", timestamp = now, latency = latency)
-        response.copy(entity = response.entity.transformDataBytes(entityFlow(responseLog, metrics)))}
+  
+  def request(req: HttpRequest): Future[HttpResponse] = {
+    val startTime = Instant.now
+    Source.single(req)
+      .via(outgoingConn)
+      .completionTimeout(timeout)
       .runWith(Sink.head)
-
-    Future.firstCompletedOf(
-      List(resp,
-        after(httpTimeout, system.scheduler)(Future {indexTimeout(requestId, metrics); throw new TimeoutException})))
-  }
-
-  def get(uri: String, params: Map[String, String] = Map(), method: HttpMethod=HttpMethods.GET,
-          oauth: Oauth=new Oauth("", ""), metrics: Map[String, String] = Map()): Future[HttpResponse] = {
-    var headers = List(RawHeader("Accept", "*/*"))
-
-    if (oauth.canSignRequests) {
-      // get a signed header
-      headers = List(
-        RawHeader(
-          "Authorization",
-          oauth.getSignedHeader(baseUri+uri, "GET", params)
-        ),
-        RawHeader("Accept", "*/*")
-      )
-    }
-
-    var queryParams = ""
-    if (params.nonEmpty) {
-      queryParams = "?" + getFormURLEncoded(params)
-    }
-
-    val requestID = java.util.UUID.randomUUID()
-    val request = HttpRequest(uri = uri + queryParams, method=method, headers=headers)
-    requestFlow(request, requestID.toString, metrics)
-  }
-
-  def post(uri: String, params: Map[String, String] = Map(), oauth: Oauth=new Oauth("", ""), json: Boolean = true,
-           metrics: Map[String, String] = Map(), body: Option[String] = None): Future[HttpResponse] = {
-
-    var headers = List(RawHeader("Accept", "*/*"))
-
-    if (oauth.hasKeys && !oauth.canSignRequests) {
-      if (oauth.authProgress == AuthProgress.Unauthenticated) {
-        headers = List(RawHeader("Authorization", oauth.getRequestTokenHeader(baseUri+uri)), RawHeader("Accept", "*/*"))
-      } else if (oauth.authProgress == AuthProgress.HasRequestTokens || oauth.authProgress == AuthProgress.RequestRefreshTokens) {
-        headers = List(RawHeader("Authorization", oauth.getAccessTokenHeader(baseUri+uri)), RawHeader("Accept", "*/*"))
+      .andThen {
+          case Success(res) => logger.log(req, res, JavaDuration.between(startTime, Instant.now))
+          case Failure(_ : TimeoutException) => logger.logTimeout(req)
       }
-    } else if (oauth.canSignRequests) {
-      headers = List(RawHeader("Authorization", oauth.getSignedHeader(baseUri+uri, "POST", params)), RawHeader("Accept", "*/*"))
-    }
-
-    val entity = if (params.nonEmpty && !oauth.canSignRequests && json) {
-        val paramStr = ByteString(params.toJson.toString())
-        HttpEntity(contentType=ContentTypes.`application/json`, contentLength=paramStr.length, Source(List(paramStr)))
-    } else if ((params.nonEmpty && json == false) || oauth.canSignRequests) {
-
-      // application/x-www-form-urlencoded
-      val paramStr = ByteString(getFormURLEncoded(params))
-      HttpEntity(
-        contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`),
-        contentLength = paramStr.length,
-        Source(List(paramStr)))
-    } else if (body.isDefined) {
-      val bodyStr = ByteString(body.get)
-      val cType = if (json) ContentTypes.`application/json` else ContentTypes.`text/plain(UTF-8)`
-      HttpEntity(contentType=cType, contentLength=bodyStr.length, Source(List(bodyStr)))
-    } else {
-      HttpEntity.Empty
-    }
-
-    val postRequest = HttpRequest(
-      uri = uri,
-      method = HttpMethods.POST,
-      headers = headers,
-      entity = entity)
-
-    val requestID = java.util.UUID.randomUUID()
-    requestFlow(postRequest, requestID.toString, metrics)
   }
-
-  def delete(uri: String): Future[HttpResponse] =
-    get(uri=uri, method=HttpMethods.DELETE)
+  
+  def parseJsonResponse[T](resp: HttpResponse)(implicit um: Unmarshaller[ResponseEntity, T]): Future[T] = {
+    resp.status match {
+       // TODO: make this optional?
+      case success: StatusCodes.Success => Unmarshal(resp.entity.withContentType(ContentTypes.`application/json`)).to[T]
+      case other => resp.entity.toStrict(timeout).flatMap { strictEntity => 
+        Future.failed(ClientRequestError(other, strictEntity.data))
+      }
+    }
+  }
+  
+  def oauthHeaders(path: String, method: HttpMethod, params: Map[String, String] = Map()): List[RawHeader] = {
+    if (oauth.canSignRequests) {
+      List(RawHeader("Authorization", oauth.getSignedHeader(baseUri+path, method.value, params)))
+    } else if (oauth.hasKeys) {
+      if (oauth.authProgress == AuthProgress.Unauthenticated) {
+        List(RawHeader("Authorization", oauth.getRequestTokenHeader(baseUri+path)))
+      } else if (oauth.authProgress == AuthProgress.HasRequestTokens || oauth.authProgress == AuthProgress.RequestRefreshTokens) {
+        List(RawHeader("Authorization", oauth.getAccessTokenHeader(baseUri+path)))
+      } else {
+        List()
+      }
+    } else {
+      List()
+    }
+  }
+  
+  def get[Res](path: String, params: Map[String, String] = Map(), headers: Seq[HttpHeader] = Seq())
+    (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.GET, params) ++ headers
+    val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
+    request(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.GET, headers=allHeaders)).flatMap(parseJsonResponse(_))
+  }
+  
+  def post[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
+    (implicit m: Marshaller[Req, RequestEntity], um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.POST) ++ headers
+    for {
+      entity <- Marshal(body).to[MessageEntity]
+      response <- request(HttpRequest(uri = baseUri + path, method=HttpMethods.POST, entity=entity, headers=allHeaders))
+      parsedResponse <- parseJsonResponse(response)
+    } yield parsedResponse
+  }
+  
+  def delete[Res](path: String, params: Map[String, String] = Map(), headers: Seq[HttpHeader] = Seq())
+    (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.DELETE, params) ++ headers
+    val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
+    request(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.DELETE, headers=allHeaders)).flatMap(parseJsonResponse(_))
+  }
+  
+  def put[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
+    (implicit m: Marshaller[Req, RequestEntity], um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.PUT) ++ headers
+    for {
+      entity <- Marshal(body).to[MessageEntity]
+      response <- request(HttpRequest(uri = baseUri + path, method=HttpMethods.PUT, entity=entity, headers=allHeaders))
+      parsedResponse <- parseJsonResponse(response)
+    } yield parsedResponse
+  }
+  
+  def requestUrlEncoded[Res](method: HttpMethod, path: String, params: Map[String, String], headers: Seq[HttpHeader] = Seq())
+    (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    val allHeaders = defaultHeaders ++ oauthHeaders(path, method, params) ++ headers
+    val paramStr = ByteString(getFormURLEncoded(params))
+    val contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`)
+    val entity = HttpEntity.Strict(contentType, paramStr)
+    request(HttpRequest(uri = baseUri + path, method=method, entity=entity, headers=allHeaders)).flatMap(parseJsonResponse(_))
+  }
+  
+  def postUrlEncoded[Res](path: String, params: Map[String, String], headers: Seq[HttpHeader] = Seq())
+    (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    requestUrlEncoded(HttpMethods.POST, path, params, headers)
+  }
+  
+  def putUrlEncoded[Res](path: String, params: Map[String, String], headers: Seq[HttpHeader] = Seq())
+    (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
+    requestUrlEncoded(HttpMethods.PUT, path, params, headers)
+  }
 }

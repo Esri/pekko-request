@@ -6,34 +6,34 @@ Also works with Oauth 1.0a.
 ##Usage
 
 ```scala
-import io.dronekit.request
+import io.dronekit.request.Client
 
-val request = new Request("httpbin.org", isHttps=false)
-request.get("/get")
-request.get("/post", params=Map("herp"->"derp"))
+val client = Client("http://httpbin.org")
+client.get[String]("/get")
+client.post[String, String]("/post", "body")
 
 // make it auto retry on timeout
-request.retry(3)(()=>{request.get("/get")})
+Client.retry(3){ client.get[String]("/get")} )
 ```
 
 If you want to use Oauth
 
 ```scala
-import io.dronekit.request
-import io.dronekit.oauth
+import io.dronekit.request.Client
+import io.dronekit.oauth._
 
-val request = new Request("oauthbin.com", isHttps=false)
 val oauth = new Oauth("key", "secret")
+val client = Client("http://oauthbin.com").withOauth(oauth)
 
-request.post("/v1/requesttoken", oauth=oauth)
+client.post[String, String]("/v1/requesttoken", "")
 oauth.setRequestToken("requestkey", "requestsecret")
 
-request.post("/v1/accesstoken", oauth=oauth)
+client.post[String, String]("/v1/accesstoken", "")
 oauth.setAccessToken("accesskey", "accesssecret")
 
 // send off signed requests
-request.get("/v1/echo", params=Map("get"->"value"), oauth=oauth)
-request.post("/v1/echo", params=Map("post"->"value"), oauth=oauth)
+client.get[String]("/v1/echo", params=Map("get"->"value"))
+client.postUrlEncoded[String]("/v1/echo", params=Map("post"->"value"))
 ```
 
 ##Installation
@@ -43,7 +43,7 @@ request.post("/v1/echo", params=Map("post"->"value"), oauth=oauth)
 3. add the following to `build.sbt`
 
 ```
-libraryDependencies += "io.dronekit" %% "akka-request" % "0.1"
+libraryDependencies += "io.dronekit" %% "akka-request" % "3.0.0"
 ```
 
 ##Testing

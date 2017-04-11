@@ -2,10 +2,11 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "2.5.1"
+version := "3.0.0"
 scalaVersion := "2.11.8"
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
+scalacOptions := Seq("-Ywarn-unused-import")
 
 credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 isSnapshot := true
