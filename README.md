@@ -1,9 +1,9 @@
-#akka-request
+# akka-request
 A http/https request lib for akka-http.
 
 Also works with Oauth 1.0a.
 
-##Usage
+## Usage
 
 ```scala
 import io.dronekit.request.Client
@@ -36,7 +36,7 @@ client.get[String]("/v1/echo", params=Map("get"->"value"))
 client.postUrlEncoded[String]("/v1/echo", params=Map("post"->"value"))
 ```
 
-##Installation
+## Installation
 
 1. Clone down this repo
 2. `sbt publish-local`
@@ -46,8 +46,8 @@ client.postUrlEncoded[String]("/v1/echo", params=Map("post"->"value"))
 libraryDependencies += "io.dronekit" %% "akka-request" % "3.0.0"
 ```
 
-##Testing
+## Testing
 run `sbt test`
 
-##License
+## License
 ????
