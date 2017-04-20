@@ -2,7 +2,7 @@ import java.util.concurrent.TimeoutException
 
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import io.dronekit.oauth._
+import cloud.drdrdr.oauth.Oauth
 import io.dronekit.request.{Client, PrintLogger}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Tag, _}

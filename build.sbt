@@ -3,7 +3,8 @@ enablePlugins(JavaAppPackaging)
 name := "akka-request"
 organization := "io.dronekit"
 version := "3.0.0"
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
 scalacOptions := Seq("-Ywarn-unused-import")
@@ -19,21 +20,23 @@ publishTo := {
 }
 
 libraryDependencies ++= {
-  val akkaV = "2.4.9"
-  val scalaTestV = "2.2.6"
+  val akkaV = "2.5.0"
+  val akkaHttpV = "10.0.5"
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-stream" % akkaV,
-    "com.typesafe.akka" %% "akka-http-core" % akkaV,
-    "com.typesafe.akka" %% "akka-http-testkit" % akkaV,
-    "com.typesafe.akka" %% "akka-http-experimental" % akkaV,
-    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaV,
-    "io.spray" %%  "spray-json" % "1.3.2",
+    
+    "com.typesafe.akka" %% "akka-http-core" % akkaHttpV,
+    "com.typesafe.akka" %% "akka-http" % akkaHttpV,
+    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV,
+    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
+    
+    "io.spray" %%  "spray-json" % "1.3.3",
     "commons-codec" % "commons-codec" % "1.6",
-    "io.dronekit" %% "oauth-headers" % "0.3",
-    "org.scalatest" %% "scalatest" % scalaTestV % "test",
+    "cloud.drdrdr" %% "oauth-headers" % "0.3",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "ch.qos.logback" % "logback-classic" % "1.1.3",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     "joda-time" % "joda-time" % "2.8.2"
   )
 }

@@ -10,7 +10,7 @@ import akka.http.scaladsl.model.headers._
 import akka.stream.scaladsl._
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
-import io.dronekit.oauth._
+import cloud.drdrdr.oauth.{Oauth, AuthProgress}
 import akka.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
 import akka.http.scaladsl.marshalling.{ Marshal, Marshaller }
 
