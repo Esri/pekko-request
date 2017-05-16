@@ -110,18 +110,25 @@ final class Client(
   val outgoingConn: Flow[HttpRequest, HttpResponse, Any],
   val logger: RequestLogger = NullLogger,
   val timeout: FiniteDuration = 60.seconds,
-  val oauth: Oauth = new Oauth("", ""))
+  val oauth: Oauth = new Oauth("", ""),
+  val defaultHeaders: List[HttpHeader] = List())
   (implicit materializer: ActorMaterializer, system: ActorSystem) {
   
   def withOauth(newOauth: Oauth) = {
-    new Client(baseUri, outgoingConn, logger, timeout, newOauth)
+    new Client(baseUri, outgoingConn, logger, timeout, newOauth, defaultHeaders)
   }
   
   def withTimeout(newTimeout: FiniteDuration) = {
-    new Client(baseUri, outgoingConn, logger, newTimeout, oauth)
+    new Client(baseUri, outgoingConn, logger, newTimeout, oauth, defaultHeaders)
   }
   
-  var defaultHeaders = List(RawHeader("Accept", "*/*"))
+  def withHeader(newHeader: HttpHeader) = {
+    new Client(baseUri, outgoingConn, logger, timeout, oauth, defaultHeaders :+ newHeader)
+  }
+  
+  def withHeaders(newHeaders: Seq[HttpHeader]) = {
+    new Client(baseUri, outgoingConn, logger, timeout, oauth, defaultHeaders ++ newHeaders)
+  }
   
   private def getFormURLEncoded(params: Map[String, String]): String = {
     val sortedParams = SortedMap(params.toList:_*)

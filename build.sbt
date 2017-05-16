@@ -2,7 +2,7 @@ enablePlugins(JavaAppPackaging)
 
 name := "akka-request"
 organization := "io.dronekit"
-version := "3.0.0"
+version := "3.1.0"
 scalaVersion := "2.12.1"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
