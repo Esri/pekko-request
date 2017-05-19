@@ -103,7 +103,7 @@ object Client {
   }
 }
 
-case class ClientRequestError(status: StatusCode, body: ByteString) extends RuntimeException(s"Request failed with status ${status}: ${body}")
+case class ClientRequestError(status: StatusCode, body: ByteString) extends RuntimeException(s"Request failed with status ${status}: ${body.utf8String}")
 
 final class Client(
   val baseUri: String,
