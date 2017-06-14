@@ -52,7 +52,7 @@ object PrintLogger extends RequestLogger {
   }
   
   def logRequest(request: HttpRequest) = {
-    println(s"<~ ${request.method.value} ${request.getUri}")
+    println(s"<~ ${request.method.value} ${request.uri}")
     printEntity(request.entity)
   }
   
@@ -103,7 +103,7 @@ object Client {
   }
 }
 
-case class ClientRequestError(status: StatusCode, body: ByteString) extends RuntimeException(s"Request failed with status ${status}: ${body.utf8String}")
+case class ClientRequestError(status: StatusCode, body: ByteString, method: HttpMethod, uri: Uri) extends RuntimeException(s"Request for ${method.value} ${uri} failed with status ${status}: ${body.utf8String}")
 
 final class Client(
   val baseUri: String,
@@ -149,12 +149,16 @@ final class Client(
       }
   }
   
-  def parseJsonResponse[T](resp: HttpResponse)(implicit um: Unmarshaller[ResponseEntity, T]): Future[T] = {
+  def jsonRequest[T](req: HttpRequest)(implicit um: Unmarshaller[ResponseEntity, T]): Future[T] = {
+    request(req).flatMap(parseJsonResponse(req, _))
+  }
+  
+  def parseJsonResponse[T](req: HttpRequest, resp: HttpResponse)(implicit um: Unmarshaller[ResponseEntity, T]): Future[T] = {
     resp.status match {
        // TODO: make this optional?
       case success: StatusCodes.Success => Unmarshal(resp.entity.withContentType(ContentTypes.`application/json`)).to[T]
       case other => resp.entity.toStrict(timeout).flatMap { strictEntity => 
-        Future.failed(ClientRequestError(other, strictEntity.data))
+        Future.failed(ClientRequestError(other, strictEntity.data, req.method, req.uri))
       }
     }
   }
@@ -179,7 +183,7 @@ final class Client(
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
     val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.GET, params) ++ headers
     val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
-    request(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.GET, headers=allHeaders)).flatMap(parseJsonResponse(_))
+    jsonRequest(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.GET, headers=allHeaders))
   }
   
   def post[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
@@ -187,8 +191,7 @@ final class Client(
     val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.POST) ++ headers
     for {
       entity <- Marshal(body).to[MessageEntity]
-      response <- request(HttpRequest(uri = baseUri + path, method=HttpMethods.POST, entity=entity, headers=allHeaders))
-      parsedResponse <- parseJsonResponse(response)
+      parsedResponse <- jsonRequest(HttpRequest(uri = baseUri + path, method=HttpMethods.POST, entity=entity, headers=allHeaders))
     } yield parsedResponse
   }
   
@@ -196,7 +199,7 @@ final class Client(
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
     val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.DELETE, params) ++ headers
     val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
-    request(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.DELETE, headers=allHeaders)).flatMap(parseJsonResponse(_))
+    jsonRequest(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.DELETE, headers=allHeaders))
   }
   
   def put[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
@@ -204,8 +207,7 @@ final class Client(
     val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.PUT) ++ headers
     for {
       entity <- Marshal(body).to[MessageEntity]
-      response <- request(HttpRequest(uri = baseUri + path, method=HttpMethods.PUT, entity=entity, headers=allHeaders))
-      parsedResponse <- parseJsonResponse(response)
+      parsedResponse <- jsonRequest(HttpRequest(uri = baseUri + path, method=HttpMethods.PUT, entity=entity, headers=allHeaders))
     } yield parsedResponse
   }
   
@@ -215,7 +217,7 @@ final class Client(
     val paramStr = ByteString(getFormURLEncoded(params))
     val contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`)
     val entity = HttpEntity.Strict(contentType, paramStr)
-    request(HttpRequest(uri = baseUri + path, method=method, entity=entity, headers=allHeaders)).flatMap(parseJsonResponse(_))
+    jsonRequest(HttpRequest(uri = baseUri + path, method=method, entity=entity, headers=allHeaders))
   }
   
   def postUrlEncoded[Res](path: String, params: Map[String, String], headers: Seq[HttpHeader] = Seq())
