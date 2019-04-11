@@ -215,7 +215,7 @@ final class Client(
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
     val allHeaders = defaultHeaders ++ oauthHeaders(path, method, params) ++ headers
     val paramStr = ByteString(getFormURLEncoded(params))
-    val contentType = ContentType(MediaTypes.`application/x-www-form-urlencoded`, HttpCharsets.`UTF-8`)
+    val contentType = MediaTypes.`application/x-www-form-urlencoded`
     val entity = HttpEntity.Strict(contentType, paramStr)
     jsonRequest(HttpRequest(uri = baseUri + path, method=method, entity=entity, headers=allHeaders))
   }
