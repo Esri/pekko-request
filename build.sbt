@@ -28,15 +28,14 @@ libraryDependencies ++= {
     
     "com.typesafe.akka" %% "akka-http-core" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV,
-    
-    "io.spray" %%  "spray-json" % "1.3.3",
-    "commons-codec" % "commons-codec" % "1.6",
-    "cloud.drdrdr" %% "oauth-headers" % "0.3",
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-    "ch.qos.logback" % "logback-classic" % "1.1.3",
+
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
-    "joda-time" % "joda-time" % "2.8.2"
+    "cloud.drdrdr" %% "oauth-headers" % "0.3",
+    
+    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV % Test,
+    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV % Test,
+    "io.spray" %%  "spray-json" % "1.3.3" % Test,
+    "org.scalatest" %% "scalatest" % "3.0.1" % Test,
+    "ch.qos.logback" % "logback-classic" % "1.1.3" % Test
   )
 }
