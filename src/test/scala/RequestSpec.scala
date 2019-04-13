@@ -28,17 +28,17 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   import TestProtocol._
 
   describe("Requests") {
-    val client = Client("http://httpbin.org", PrintLogger)
+    val client = Client("https://httpbin.org", PrintLogger)
     it("should be able to GET", PostTest) {
       ScalaFutures.whenReady(client.get[JsObject]("/get"), timeout(5 seconds), interval(500 millis)) { jsObj =>
-       assert(jsObj.fields("url").toString == """"http://httpbin.org/get"""")
+       assert(jsObj.fields("url").toString == """"https://httpbin.org/get"""")
        assert(jsObj.fields("args").toString == """{}""")
       }
     }
 
     it("should be able to POST") {
       ScalaFutures.whenReady(client.postUrlEncoded[JsObject]("/post", Map("item"->"1", "item"->"2")), timeout(5 seconds), interval(500 millis)) { jsObj =>
-        assert(jsObj.fields("url").toString === """"http://httpbin.org/post"""")
+        assert(jsObj.fields("url").toString === """"https://httpbin.org/post"""")
         assert(jsObj.fields("args").toString === """{}""")
         assert(jsObj.fields("form").toString === """{"item":"2"}""")
       }
