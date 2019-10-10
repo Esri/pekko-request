@@ -32,9 +32,9 @@ libraryDependencies ++= {
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
     
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV % Test,
-    "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV % Test,
-    "io.spray" %%  "spray-json" % "1.3.3" % Test,
-    "org.scalatest" %% "scalatest" % "3.0.1" % Test,
+    "de.heikoseeberger" %% "akka-http-play-json" % "1.27.0" % Test,
+    "com.typesafe.play" %% "play-json" % "2.7.4" % Test,
+    "org.scalatest" %% "scalatest" % "3.0.8" % Test,
     "ch.qos.logback" % "logback-classic" % "1.1.3" % Test
   )
 }
