@@ -1,12 +1,10 @@
-enablePlugins(JavaAppPackaging)
-
 name := "akka-request"
 organization := "io.dronekit"
 version := "3.3.0"
-scalaVersion := "2.12.8"
+scalaVersion := "2.13.1"
+crossScalaVersions := Seq("2.12.10", "2.13.1")
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
-scalacOptions := Seq("-Ywarn-unused-import")
 
 credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 isSnapshot := true
@@ -19,8 +17,8 @@ publishTo := {
 }
 
 libraryDependencies ++= {
-  val akkaV = "2.5.22"
-  val akkaHttpV = "10.1.8"
+  val akkaV = "2.5.25"
+  val akkaHttpV = "10.1.10"
   
   Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaV,
@@ -29,7 +27,7 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http-core" % akkaHttpV,
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
 
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
     
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV % Test,
     "de.heikoseeberger" %% "akka-http-play-json" % "1.27.0" % Test,
