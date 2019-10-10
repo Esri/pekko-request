@@ -2,7 +2,6 @@ import java.util.concurrent.TimeoutException
 
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import cloud.drdrdr.oauth.Oauth
 import io.dronekit.request.{Client, PrintLogger}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Tag, _}
@@ -63,47 +62,6 @@ class RequestSpec extends FunSpec with Matchers with ScalaFutures {
         Await.result(req, 20 seconds)
       }
       count shouldBe 4
-    }
-  }
-
-  describe("Oauth") {
-    val baseUri = "http://oauthbin.com"
-    val client = Client(baseUri)
-
-    describe("when it has a key and secret") {
-      val oauth = new Oauth(key="key", secret="secret")
-      it ("should be able to get a request token"){
-        ScalaFutures.whenReady(client.withOauth(oauth).post[String, String]("/v1/request-token", body=""), timeout(5 seconds), interval(500 millis)) { data =>
-          assert(data === "oauth_token=requestkey&oauth_token_secret=requestsecret")
-        }
-      }
-    }
-
-    describe("when it has a request secret") {
-      val oauth = new Oauth(key="key", secret="secret")
-      oauth.setRequestTokens("requestkey", "requestsecret")
-      it("should be able to get an access token"){
-        ScalaFutures.whenReady(client.withOauth(oauth).post[String, String]("/v1/access-token", body=""), timeout(5 seconds), interval(500 millis)) { data =>
-          assert(data==="oauth_token=accesskey&oauth_token_secret=accesssecret")
-        }
-      }
-    }
-
-    describe("when it has an access token") {
-      val oauth = new Oauth(key="key", secret="secret")
-      oauth.setAccessTokens("accesskey", "accesssecret")
-
-      it("should be able to send a GET") {
-        ScalaFutures.whenReady(client.withOauth(oauth).get[String]("/v1/echo", params=Map("a"->"1", "b"->"2")), timeout(5 seconds), interval(500 millis)) { data =>
-          assert(data==="a=1&b=2")
-        }
-      }
-
-      it("should be able to send a POST") {
-        ScalaFutures.whenReady(client.withOauth(oauth).postUrlEncoded[String]("/v1/echo", Map("c"->"1", "d"->"2")), timeout(5 seconds), interval(500 millis)) { data =>
-          assert(data==="c=1&d=2")
-         }
-      }
     }
   }
 }

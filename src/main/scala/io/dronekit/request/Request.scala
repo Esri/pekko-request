@@ -6,11 +6,9 @@ import java.util.concurrent.TimeoutException
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers._
 import akka.stream.scaladsl._
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
-import cloud.drdrdr.oauth.{Oauth, AuthProgress}
 import akka.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
 import akka.http.scaladsl.marshalling.{ Marshal, Marshaller }
 
@@ -110,24 +108,19 @@ final class Client(
   val outgoingConn: Flow[HttpRequest, HttpResponse, Any],
   val logger: RequestLogger = NullLogger,
   val timeout: FiniteDuration = 60.seconds,
-  val oauth: Oauth = new Oauth("", ""),
   val defaultHeaders: List[HttpHeader] = List())
   (implicit materializer: ActorMaterializer, system: ActorSystem) {
   
-  def withOauth(newOauth: Oauth) = {
-    new Client(baseUri, outgoingConn, logger, timeout, newOauth, defaultHeaders)
-  }
-  
   def withTimeout(newTimeout: FiniteDuration) = {
-    new Client(baseUri, outgoingConn, logger, newTimeout, oauth, defaultHeaders)
+    new Client(baseUri, outgoingConn, logger, newTimeout, defaultHeaders)
   }
   
   def withHeader(newHeader: HttpHeader) = {
-    new Client(baseUri, outgoingConn, logger, timeout, oauth, defaultHeaders :+ newHeader)
+    new Client(baseUri, outgoingConn, logger, timeout, defaultHeaders :+ newHeader)
   }
   
   def withHeaders(newHeaders: Seq[HttpHeader]) = {
-    new Client(baseUri, outgoingConn, logger, timeout, oauth, defaultHeaders ++ newHeaders)
+    new Client(baseUri, outgoingConn, logger, timeout, defaultHeaders ++ newHeaders)
   }
   
   private def getFormURLEncoded(params: Map[String, String]): String = {
@@ -163,32 +156,16 @@ final class Client(
     }
   }
   
-  def oauthHeaders(path: String, method: HttpMethod, params: Map[String, String] = Map()): List[RawHeader] = {
-    if (oauth.canSignRequests) {
-      List(RawHeader("Authorization", oauth.getSignedHeader(baseUri+path, method.value, params)))
-    } else if (oauth.hasKeys) {
-      if (oauth.authProgress == AuthProgress.Unauthenticated) {
-        List(RawHeader("Authorization", oauth.getRequestTokenHeader(baseUri+path)))
-      } else if (oauth.authProgress == AuthProgress.HasRequestTokens || oauth.authProgress == AuthProgress.RequestRefreshTokens) {
-        List(RawHeader("Authorization", oauth.getAccessTokenHeader(baseUri+path)))
-      } else {
-        List()
-      }
-    } else {
-      List()
-    }
-  }
-  
   def get[Res](path: String, params: Map[String, String] = Map(), headers: Seq[HttpHeader] = Seq())
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
-    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.GET, params) ++ headers
+    val allHeaders = defaultHeaders ++ headers
     val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
     jsonRequest(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.GET, headers=allHeaders))
   }
   
   def post[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
     (implicit m: Marshaller[Req, RequestEntity], um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
-    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.POST) ++ headers
+    val allHeaders = defaultHeaders ++ headers
     for {
       entity <- Marshal(body).to[MessageEntity]
       parsedResponse <- jsonRequest(HttpRequest(uri = baseUri + path, method=HttpMethods.POST, entity=entity, headers=allHeaders))
@@ -197,14 +174,14 @@ final class Client(
   
   def delete[Res](path: String, params: Map[String, String] = Map(), headers: Seq[HttpHeader] = Seq())
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
-    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.DELETE, params) ++ headers
+    val allHeaders = defaultHeaders ++ headers
     val queryParams = if (params.nonEmpty) { "?" + getFormURLEncoded(params) } else { "" }
     jsonRequest(HttpRequest(uri = baseUri + path + queryParams, method=HttpMethods.DELETE, headers=allHeaders))
   }
   
   def put[Req, Res](path: String, body: Req, headers: Seq[HttpHeader] = Seq())
     (implicit m: Marshaller[Req, RequestEntity], um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
-    val allHeaders = defaultHeaders ++ oauthHeaders(path, HttpMethods.PUT) ++ headers
+    val allHeaders = defaultHeaders ++ headers
     for {
       entity <- Marshal(body).to[MessageEntity]
       parsedResponse <- jsonRequest(HttpRequest(uri = baseUri + path, method=HttpMethods.PUT, entity=entity, headers=allHeaders))
@@ -213,7 +190,7 @@ final class Client(
   
   def requestUrlEncoded[Res](method: HttpMethod, path: String, params: Map[String, String], headers: Seq[HttpHeader] = Seq())
     (implicit um: Unmarshaller[ResponseEntity, Res]): Future[Res] = {
-    val allHeaders = defaultHeaders ++ oauthHeaders(path, method, params) ++ headers
+    val allHeaders = defaultHeaders ++ headers
     val paramStr = ByteString(getFormURLEncoded(params))
     val contentType = MediaTypes.`application/x-www-form-urlencoded`
     val entity = HttpEntity.Strict(contentType, paramStr)

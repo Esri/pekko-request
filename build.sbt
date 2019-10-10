@@ -30,7 +30,6 @@ libraryDependencies ++= {
     "com.typesafe.akka" %% "akka-http" % akkaHttpV,
 
     "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
-    "cloud.drdrdr" %% "oauth-headers" % "0.3",
     
     "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV % Test,
     "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpV % Test,
