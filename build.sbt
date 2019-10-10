@@ -1,6 +1,6 @@
 name := "akka-request"
 organization := "io.dronekit"
-version := "3.3.0"
+version := "4.0.0"
 scalaVersion := "2.13.1"
 crossScalaVersions := Seq("2.12.10", "2.13.1")
 
