@@ -33,7 +33,6 @@ object PrintLogger extends RequestLogger {
     if (!entity.isKnownEmpty) {
       val lenStr = entity.contentLengthOption.map(l => s"${l} bytes").getOrElse("unknown size")
       entity.contentType match {
-        case ct: ContentType.Binary => println(s"\t(${ct}, ${lenStr})")
         case ct: ContentType.NonBinary => {
           entity match {
             case strict: HttpEntity.Strict => {
@@ -42,9 +41,10 @@ object PrintLogger extends RequestLogger {
                 println("\t| " + s.replace("\n", "\n\t| "))
               }
             }
-            case ct => println(s"\t(${ct}, ${lenStr})")
+            case _ => println(s"\t(${ct}, ${lenStr})")
           }
         }
+        case ct => println(s"\t(${ct}, ${lenStr})")
       }
     }
   }
