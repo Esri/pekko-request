@@ -1,5 +1,9 @@
 name := "akka-request"
 organization := "io.dronekit"
+
+organizationName := "3DR"
+licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
+
 version := "4.0.0"
 scalaVersion := "2.13.1"
 crossScalaVersions := Seq("2.12.10", "2.13.1")
