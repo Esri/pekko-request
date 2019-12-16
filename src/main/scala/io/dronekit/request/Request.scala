@@ -1,3 +1,4 @@
+// © 2019 3D Robotics. License: ISC
 package io.dronekit.request
 
 import java.time.{Instant, Duration => JavaDuration}
