@@ -21,7 +21,6 @@ object TestObj {
 
 class RequestSpec extends FunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
-  implicit val materializer = ActorMaterializer()
   implicit val timeout = Timeout(5 seconds)
 
   describe("Requests") {

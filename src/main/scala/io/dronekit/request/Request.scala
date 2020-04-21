@@ -68,8 +68,7 @@ object PrintLogger extends RequestLogger {
 }
 
 object Client {
-  def apply(baseUri: String, logger: RequestLogger = NullLogger)
-    (implicit materializer: ActorMaterializer, system: ActorSystem) = {
+  def apply(baseUri: String, logger: RequestLogger = NullLogger)(implicit system: ActorSystem) = {
     require(baseUri.startsWith("http"))
     val uri = java.net.URI.create(baseUri)
     var httpTimeout = 60.seconds
@@ -110,7 +109,7 @@ final class Client(
   val logger: RequestLogger = NullLogger,
   val timeout: FiniteDuration = 60.seconds,
   val defaultHeaders: List[HttpHeader] = List())
-  (implicit materializer: ActorMaterializer, system: ActorSystem) {
+  (implicit system: ActorSystem) {
   
   def withTimeout(newTimeout: FiniteDuration) = {
     new Client(baseUri, outgoingConn, logger, newTimeout, defaultHeaders)
