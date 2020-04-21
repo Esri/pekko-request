@@ -70,19 +70,7 @@ object PrintLogger extends RequestLogger {
 object Client {
   def apply(baseUri: String, logger: RequestLogger = NullLogger)
     (implicit materializer: ActorMaterializer, system: ActorSystem) = {
-    require(baseUri.startsWith("http"))
-    val uri = java.net.URI.create(baseUri)
-    var httpTimeout = 60.seconds
-    val hostname = uri.getHost
-    val httpScheme = if (uri.getScheme == null) "https" else uri.getScheme
-    val port = if (uri.getPort == -1) (if (httpScheme == "http") 80 else 443) else uri.getPort
-    val outgoingConn = if (httpScheme == "https") {
-      Http().outgoingConnectionHttps(hostname, port)
-    } else {
-      Http().outgoingConnection(hostname, port)
-    }
-    
-    new Client(baseUri, outgoingConn, logger)
+    new Client(baseUri, logger)
   }
   
   def retry[T](retries: Int = 3)(req: => Future[T]): Future[T] = {
@@ -106,22 +94,23 @@ case class ClientRequestError(status: StatusCode, body: ByteString, method: Http
 
 final class Client(
   val baseUri: String,
-  val outgoingConn: Flow[HttpRequest, HttpResponse, Any],
   val logger: RequestLogger = NullLogger,
   val timeout: FiniteDuration = 60.seconds,
   val defaultHeaders: List[HttpHeader] = List())
   (implicit materializer: ActorMaterializer, system: ActorSystem) {
+
+  require(baseUri.startsWith("http"))
   
   def withTimeout(newTimeout: FiniteDuration) = {
-    new Client(baseUri, outgoingConn, logger, newTimeout, defaultHeaders)
+    new Client(baseUri, logger, newTimeout, defaultHeaders)
   }
   
   def withHeader(newHeader: HttpHeader) = {
-    new Client(baseUri, outgoingConn, logger, timeout, defaultHeaders :+ newHeader)
+    new Client(baseUri, logger, timeout, defaultHeaders :+ newHeader)
   }
   
   def withHeaders(newHeaders: Seq[HttpHeader]) = {
-    new Client(baseUri, outgoingConn, logger, timeout, defaultHeaders ++ newHeaders)
+    new Client(baseUri, logger, timeout, defaultHeaders ++ newHeaders)
   }
   
   private def getFormURLEncoded(params: Map[String, String]): String = {
@@ -133,14 +122,10 @@ final class Client(
   
   def request(req: HttpRequest): Future[HttpResponse] = {
     val startTime = Instant.now
-    Source.single(req)
-      .via(outgoingConn)
-      .completionTimeout(timeout)
-      .runWith(Sink.head)
-      .andThen {
-          case Success(res) => logger.log(req, res, JavaDuration.between(startTime, Instant.now))
-          case Failure(_ : TimeoutException) => logger.logTimeout(req)
-      }
+    Http().singleRequest(req).andThen {
+        case Success(res) => logger.log(req, res, JavaDuration.between(startTime, Instant.now))
+        case Failure(_ : TimeoutException) => logger.logTimeout(req)
+    }
   }
   
   def jsonRequest[T](req: HttpRequest)(implicit um: Unmarshaller[ResponseEntity, T]): Future[T] = {
