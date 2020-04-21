@@ -6,7 +6,6 @@ licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
 
 version := "4.0.1"
 scalaVersion := "2.13.1"
-crossScalaVersions := Seq("2.12.10", "2.13.1")
 
 resolvers += "Artifactory" at "https://dronekit.artifactoryonline.com/dronekit/libs-snapshot-local/"
 
@@ -19,6 +18,7 @@ publishTo := {
   else
     Some("snapshots" at artifactory + "dronekit/libs-release-local")
 }
+scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
   val akkaV = "2.5.25"

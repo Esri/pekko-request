@@ -20,12 +20,12 @@ import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 trait RequestLogger {
-  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration)
-  def logTimeout(request: HttpRequest)
+  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration): Unit
+  def logTimeout(request: HttpRequest): Unit
 }
 
 object NullLogger extends RequestLogger {
-  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration) = {}
+  def log(request: HttpRequest, response: HttpResponse, latency: JavaDuration): Unit = {}
   def logTimeout(request: HttpRequest) = {}
 }
 
