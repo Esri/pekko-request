@@ -5,7 +5,8 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import io.dronekit.request.{Client, PrintLogger}
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest._
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.funspec.AnyFunSpec
 import play.api.libs.json._
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
 
@@ -19,7 +20,7 @@ object TestObj {
   implicit val format = Json.format[TestObj]
 }
 
-class RequestSpec extends FunSpec with Matchers with ScalaFutures {
+class RequestSpec extends AnyFunSpec with Matchers with ScalaFutures {
   implicit val testSystem = akka.actor.ActorSystem("test-system")
   implicit val timeout = Timeout(5 seconds)
 
