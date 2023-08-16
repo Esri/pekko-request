@@ -4,14 +4,14 @@ package io.dronekit.request
 import java.time.{Instant, Duration => JavaDuration}
 import java.util.concurrent.TimeoutException
 
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.stream.scaladsl._
-import akka.stream.ActorMaterializer
-import akka.util.ByteString
-import akka.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
-import akka.http.scaladsl.marshalling.{ Marshal, Marshaller }
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.stream.scaladsl._
+import org.apache.pekko.stream.ActorMaterializer
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.http.scaladsl.unmarshalling.{ Unmarshal, Unmarshaller }
+import org.apache.pekko.http.scaladsl.marshalling.{ Marshal, Marshaller }
 
 import scala.collection.immutable.SortedMap
 import scala.concurrent.ExecutionContext.Implicits.global

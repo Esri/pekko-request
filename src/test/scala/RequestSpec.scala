@@ -1,14 +1,15 @@
 // © 2019 3D Robotics. License: ISC
 import java.util.concurrent.TimeoutException
 
-import akka.stream.ActorMaterializer
-import akka.util.Timeout
+import org.apache.pekko.stream.ActorMaterializer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.util.Timeout
 import io.dronekit.request.{Client, PrintLogger}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec
 import play.api.libs.json._
-import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport._
+import com.github.pjfanning.pekkohttpplayjson.PlayJsonSupport._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -17,12 +18,12 @@ import scala.language.postfixOps
 case class TestObj(name: String, age: Int)
 
 object TestObj {
-  implicit val format = Json.format[TestObj]
+  implicit val format: Format[TestObj] = Json.format[TestObj]
 }
 
 class RequestSpec extends AnyFunSpec with Matchers with ScalaFutures {
-  implicit val testSystem = akka.actor.ActorSystem("test-system")
-  implicit val timeout = Timeout(5 seconds)
+  implicit val testSystem: ActorSystem = ActorSystem("test-system")
+  implicit val timeout: Timeout = Timeout(5 seconds)
 
   describe("Requests") {
     val client = Client("https://httpbin.org", PrintLogger)

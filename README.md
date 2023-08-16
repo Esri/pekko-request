@@ -1,5 +1,5 @@
-# akka-request
-A http/https request lib for akka-http.
+# pekko-request
+A http/https request lib for pekko-http.
 
 ## Usage
 
