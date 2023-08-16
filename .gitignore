@@ -17,6 +17,10 @@ project/boot/
 project/plugins/project/
 
 # Scala-IDE specific
+.bloop
+.metals
+project/.bloop
+.vscode
 .scala_dependencies
 .worksheet
 .idea/
