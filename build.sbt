@@ -1,5 +1,5 @@
 name := "pekko-request"
-organization := "io.dronekit"
+organization := "com.arcgis.sitescan"
 licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
 version := "5.0.0"
 

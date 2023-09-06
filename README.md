@@ -4,7 +4,7 @@ A http/https request lib for pekko-http.
 ## Usage
 
 ```scala
-import io.dronekit.request.Client
+import com.arcgis.sitescan.request.Client
 
 val client = Client("https://httpbin.org")
 client.get[String]("/get")

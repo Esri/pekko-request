@@ -4,7 +4,7 @@ import java.util.concurrent.TimeoutException
 import org.apache.pekko.stream.ActorMaterializer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.util.Timeout
-import io.dronekit.request.{Client, PrintLogger}
+import com.arcgis.sitescan.request.{Client, PrintLogger}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec

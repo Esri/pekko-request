@@ -1,5 +1,5 @@
 // © 2019 3D Robotics. License: ISC
-package io.dronekit.request
+package com.arcgis.sitescan.request
 
 import java.time.{Instant, Duration => JavaDuration}
 import java.util.concurrent.TimeoutException
