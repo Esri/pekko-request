@@ -1,28 +1,28 @@
-name := "akka-request"
-organization := "io.dronekit"
+name := "pekko-request"
+organization := "com.arcgis.sitescan"
 licenses += "ISC" -> url("https://opensource.org/licenses/ISC")
-version := "4.1.1"
+version := "5.0.0"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.11"
 scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
 
 libraryDependencies ++= {
-  val akkaV = "2.6.18"
-  val akkaHttpV = "10.2.8"
+  val pekkoV = "1.0.1"
+  val pekkoHttpV = "1.0.0"
   
   Seq(
-    "com.typesafe.akka" %% "akka-actor" % akkaV,
-    "com.typesafe.akka" %% "akka-stream" % akkaV,
+    "org.apache.pekko" %% "pekko-actor" % pekkoV,
+    "org.apache.pekko" %% "pekko-stream" % pekkoV,
     
-    "com.typesafe.akka" %% "akka-http-core" % akkaHttpV,
-    "com.typesafe.akka" %% "akka-http" % akkaHttpV,
+    "org.apache.pekko" %% "pekko-http-core" % pekkoHttpV,
+    "org.apache.pekko" %% "pekko-http" % pekkoHttpV,
 
     "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
     
-    "com.typesafe.akka" %% "akka-http-testkit" % akkaHttpV % Test,
-    "de.heikoseeberger" %% "akka-http-play-json" % "1.27.0" % Test,
+    "org.apache.pekko" %% "pekko-http-testkit" % pekkoHttpV % Test,
+    "com.github.pjfanning" %% "pekko-http-play-json" % "2.1.0",
     "com.typesafe.play" %% "play-json" % "2.8.2" % Test,
-    "org.scalatest" %% "scalatest" % "3.2.11" % Test,
-    "ch.qos.logback" % "logback-classic" % "1.2.10" % Test
+    "org.scalatest" %% "scalatest" % "3.2.16" % Test,
+    "ch.qos.logback" % "logback-classic" % "1.3.11" % Test
   )
 }
